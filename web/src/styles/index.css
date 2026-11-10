@@ -1,0 +1,170 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Map tokens into Tailwind. The default palette is cleared so only token colors exist
+ * (bg-surface, text-text-2, border-border, bg-accent, text-pass…).
+ */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-on-accent: var(--on-accent);
+  --color-pass: var(--pass);
+  --color-pass-subtle: var(--pass-subtle);
+  --color-fail: var(--fail);
+  --color-fail-subtle: var(--fail-subtle);
+  --color-warn: var(--warn);
+  --color-warn-subtle: var(--warn-subtle);
+  --color-running: var(--running);
+  --color-running-subtle: var(--running-subtle);
+  --color-skipped: var(--skipped);
+  --color-skipped-subtle: var(--skipped-subtle);
+  --color-overlay: var(--overlay);
+  --color-iris-50: var(--iris-50);
+  --color-iris-100: var(--iris-100);
+  --color-iris-200: var(--iris-200);
+  --color-iris-300: var(--iris-300);
+  --color-iris-400: var(--iris-400);
+  --color-iris-500: var(--iris-500);
+  --color-iris-600: var(--iris-600);
+  --color-iris-700: var(--iris-700);
+  --color-iris-800: var(--iris-800);
+  --color-iris-900: var(--iris-900);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-diff-add: var(--diff-add-bg);
+  --color-diff-del: var(--diff-del-bg);
+  --color-diff-add-text: var(--diff-add-text);
+  --color-diff-del-text: var(--diff-del-text);
+
+  /* --font-sans, --font-mono, --radius-sm/md/lg and --ease-out come straight from tokens.css,
+     which overrides Tailwind's layered defaults. */
+
+  /* Type scale (px/line-height): 12/16 · 13/20 · 14/20 · 16/24 · 20/28 · 24/32 · 32/40 */
+  --text-*: initial;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-md: 16px;
+  --text-md--line-height: 24px;
+  --text-lg: 20px;
+  --text-lg--line-height: 28px;
+  --text-xl: 24px;
+  --text-xl--line-height: 32px;
+  --text-2xl: 32px;
+  --text-2xl--line-height: 40px;
+
+  --shadow-*: initial;
+  --shadow-popover: var(--elevation-popover);
+  --shadow-dialog: var(--elevation-dialog);
+
+  --animate-in: overlay-in var(--duration-base) var(--ease-out);
+  --animate-fade: fade-in var(--duration-base) var(--ease-out);
+  --animate-drawer: drawer-in var(--duration-slow) var(--ease-out);
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.98);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    /* 13/20 default UI text. The root stays 16px so the 4px spacing scale (0.25rem) is exact. */
+    font-size: 13px;
+    line-height: 20px;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--accent-subtle);
+  }
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+    font-variant-ligatures: none;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
