@@ -36,6 +36,9 @@ func (n *NormalizeOptions) apply(s string) string {
 		}
 		return strings.ToLower(s)
 	}
+	if isASCII(s) {
+		return n.applyASCII(s, trim)
+	}
 	var b strings.Builder
 	b.Grow(len(s))
 	lastSpace := false
@@ -60,6 +63,37 @@ func (n *NormalizeOptions) apply(s string) string {
 		b.WriteRune(r)
 	}
 	out := b.String()
+	if trim {
+		out = strings.TrimSpace(out)
+	}
+	return out
+}
+
+func (n *NormalizeOptions) applyASCII(s string, trim bool) string {
+	buf := make([]byte, 0, len(s))
+	lastSpace := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if n.IgnorePunctuation && (c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~') {
+			continue
+		}
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f' {
+			if n.CollapseWhitespace {
+				if lastSpace {
+					continue
+				}
+				c = ' '
+			}
+			lastSpace = true
+		} else {
+			lastSpace = false
+		}
+		if n.IgnoreCase && c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		buf = append(buf, c)
+	}
+	out := string(buf)
 	if trim {
 		out = strings.TrimSpace(out)
 	}
@@ -123,53 +157,56 @@ func getInts(n int) (*[]int, []int) {
 	return p, (*p)[:n]
 }
 
-// levenshteinDistance is the rune-level edit distance between a and b, using
-// two pooled rows (O(min(len)) memory, no allocation in steady state for
-// ASCII input).
+// levenshteinDistance is the rune-level edit distance between a and b. It
+// strips the common prefix/suffix and uses two pooled rows (O(min(len))
+// memory).
 func levenshteinDistance(a, b string) int {
 	if a == b {
 		return 0
 	}
 	if isASCII(a) && isASCII(b) {
-		return levenshteinSeq(a, b, func(s string, i int) rune { return rune(s[i]) }, len(a), len(b))
+		return levenshteinSeq([]byte(a), []byte(b))
 	}
-	ra, rb := []rune(a), []rune(b)
-	return levenshteinSeq(ra, rb, func(s []rune, i int) rune { return s[i] }, len(ra), len(rb))
+	return levenshteinSeq([]rune(a), []rune(b))
 }
 
-func levenshteinSeq[S any](a, b S, at func(S, int) rune, la, lb int) int {
-	if la == 0 {
-		return lb
+func levenshteinSeq[E comparable](a, b []E) int {
+	for len(a) > 0 && len(b) > 0 && a[0] == b[0] {
+		a, b = a[1:], b[1:]
 	}
-	if lb == 0 {
-		return la
+	for len(a) > 0 && len(b) > 0 && a[len(a)-1] == b[len(b)-1] {
+		a, b = a[:len(a)-1], b[:len(b)-1]
 	}
-	if lb > la { // keep rows short
+	if len(a) == 0 {
+		return len(b)
+	}
+	if len(b) == 0 {
+		return len(a)
+	}
+	if len(b) > len(a) { // keep rows short
 		a, b = b, a
-		la, lb = lb, la
 	}
+	lb := len(b)
 	p, buf := getInts(2 * (lb + 1))
 	defer intBufPool.Put(p)
-	prev, cur := buf[:lb+1], buf[lb+1:]
+	prev, cur := buf[:lb+1], buf[lb+1:2*(lb+1)]
 	for j := range prev {
 		prev[j] = j
 	}
-	for i := 1; i <= la; i++ {
-		cur[0] = i
-		ca := at(a, i-1)
-		for j := 1; j <= lb; j++ {
-			cost := 1
-			if ca == at(b, j-1) {
-				cost = 0
+	for i, ca := range a {
+		cur[0] = i + 1
+		for j, cb := range b {
+			v := prev[j]
+			if ca != cb {
+				v++
 			}
-			v := prev[j-1] + cost
-			if d := prev[j] + 1; d < v {
+			if d := prev[j+1] + 1; d < v {
 				v = d
 			}
-			if ins := cur[j-1] + 1; ins < v {
+			if ins := cur[j] + 1; ins < v {
 				v = ins
 			}
-			cur[j] = v
+			cur[j+1] = v
 		}
 		prev, cur = cur, prev
 	}
@@ -242,6 +279,24 @@ func sentenceBLEU(cand []string, refs [][]string, maxN int, epsilon float64) flo
 	if maxN <= 0 {
 		maxN = 4
 	}
+	vocab := make(map[string]uint64, len(cand)*2)
+	candIDs, ok := tokenIDs(vocab, cand)
+	refIDs := make([][]uint64, len(refs))
+	for i, r := range refs {
+		var ok2 bool
+		refIDs[i], ok2 = tokenIDs(vocab, r)
+		ok = ok && ok2
+	}
+	if !ok {
+		// Pathologically large vocabulary: truncate so the total token count
+		// (an upper bound on the vocabulary) fits in 16-bit ids.
+		limit := 60000 / (len(refs) + 1)
+		trimmed := make([][]string, len(refs))
+		for i, r := range refs {
+			trimmed[i] = r[:min(len(r), limit)]
+		}
+		return sentenceBLEU(cand[:min(len(cand), limit)], trimmed, maxN, epsilon)
+	}
 	logSum := 0.0
 	for n := 1; n <= maxN; n++ {
 		total := len(cand) - n + 1
@@ -250,9 +305,9 @@ func sentenceBLEU(cand []string, refs [][]string, maxN int, epsilon float64) flo
 			logSum += math.Log(epsilon / 1)
 			continue
 		}
-		candCounts := ngramCounts(cand, n)
-		maxRef := map[string]int{}
-		for _, ref := range refs {
+		candCounts := ngramCounts(candIDs, n)
+		maxRef := map[uint64]int{}
+		for _, ref := range refIDs {
 			for g, c := range ngramCounts(ref, n) {
 				if c > maxRef[g] {
 					maxRef[g] = c
@@ -285,26 +340,35 @@ func sentenceBLEU(cand []string, refs [][]string, maxN int, epsilon float64) flo
 	return bp * math.Exp(logSum/float64(maxN))
 }
 
-func ngramCounts(toks []string, n int) map[string]int {
-	m := make(map[string]int, len(toks))
-	if n == 1 {
-		for _, t := range toks {
-			m[t]++
+// ngramCounts counts n-grams (n <= 4) of token ids, packed 16 bits per id.
+func ngramCounts(ids []uint64, n int) map[uint64]int {
+	m := make(map[uint64]int, len(ids))
+	for i := 0; i+n <= len(ids); i++ {
+		var k uint64
+		for j := 0; j < n; j++ {
+			k = k<<16 | ids[i+j]
 		}
-		return m
-	}
-	var b strings.Builder
-	for i := 0; i+n <= len(toks); i++ {
-		b.Reset()
-		for k := 0; k < n; k++ {
-			if k > 0 {
-				b.WriteByte(0)
-			}
-			b.WriteString(toks[i+k])
-		}
-		m[b.String()]++
+		m[k]++
 	}
 	return m
+}
+
+// tokenIDs interns tokens; ids start at 1 so packed n-grams never collide
+// with shorter ones. ok is false when the vocabulary exceeds 16 bits.
+func tokenIDs(vocab map[string]uint64, toks []string) ([]uint64, bool) {
+	out := make([]uint64, len(toks))
+	for i, t := range toks {
+		id, ok := vocab[t]
+		if !ok {
+			id = uint64(len(vocab) + 1)
+			if id >= 1<<16 {
+				return nil, false
+			}
+			vocab[t] = id
+		}
+		out[i] = id
+	}
+	return out, true
 }
 
 func abs(x int) int {

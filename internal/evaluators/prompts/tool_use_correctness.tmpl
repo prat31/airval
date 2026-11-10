@@ -1,0 +1,24 @@
+# Task: grade TOOL USE CORRECTNESS
+
+Decide whether the agent used its tools correctly to fulfil the user's request: the right tools, with correct arguments, in a sensible order, without unnecessary calls, and with the results used properly.
+{{template "input" .}}
+{{template "expected" .}}
+<tool_calls>
+{{if .ToolCalls}}{{.ToolCalls}}{{else}}(the agent made no tool calls){{end}}
+</tool_calls>
+
+{{template "output" .}}
+
+## Evaluation steps
+1. Determine which tool calls the request requires.{{if .HasExpected}} The expected section describes the intended behavior; treat it as the reference.{{end}}
+2. Check each call: is the tool appropriate, are the arguments correct and complete (values taken accurately from the request or from earlier results), and is the order logical?
+3. Look for missing required calls, redundant or harmful calls, and whether the final output faithfully reflects the tool results. Making no tool call is correct when none is needed.
+
+## Scoring
+5 - Correct tools, correct arguments, sensible order, results used properly.
+4 - Correct overall, with a minor inefficiency such as one redundant call.
+3 - Partly correct: a needed call is missing, or one argument is wrong.
+2 - Mostly incorrect: wrong tools or several wrong arguments.
+1 - Tool use fails the task entirely or is harmful.
+
+{{template "format_score" .}}

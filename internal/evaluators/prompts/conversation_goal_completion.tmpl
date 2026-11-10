@@ -1,0 +1,25 @@
+# Task: grade CONVERSATION GOAL COMPLETION
+
+Decide whether, by the end of the conversation, the assistant accomplished the user's goal.
+{{- if .Goal}}
+
+<goal>
+{{.Goal}}
+</goal>
+{{- end}}
+{{template "expected" .}}
+{{template "transcript" .}}
+
+## Evaluation steps
+1. {{if .Goal}}Use the stated goal.{{else}}Infer the user's goal from their messages.{{end}} Break it into the concrete things that must happen for the goal to be met.
+2. Walk through the conversation and check which of those things the assistant actually achieved (information given, action performed through tools, problem solved). Promises to do something later do not count.
+3. Judge the final state: did the user leave with the goal met? Penalize giving up, looping, and ending prematurely.
+
+## Scoring
+5 - Goal fully accomplished.
+4 - Goal accomplished with a minor gap the user could easily close.
+3 - Goal partly accomplished; a significant part is missing.
+2 - Little progress toward the goal.
+1 - Goal not accomplished, or the assistant worked against it.
+
+{{template "format_score" .}}

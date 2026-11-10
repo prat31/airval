@@ -107,13 +107,24 @@ func redact(s string) string {
 func detectPII(text string, enabled map[string]bool) []piiFinding {
 	var out []piiFinding
 	add := func(kind, m string) { out = append(out, piiFinding{Kind: kind, Match: redact(m)}) }
-	if enabled[PIIEmail] {
+	// Cheap prefilters: most outputs contain no candidate at all, and
+	// regexp scanning dominates the cost.
+	digits := 0
+	for i := 0; i < len(text); i++ {
+		if text[i] >= '0' && text[i] <= '9' {
+			digits++
+		}
+	}
+	if digits < 4 && !strings.Contains(text, "@") && strings.Count(text, ":") < 2 {
+		return nil
+	}
+	if enabled[PIIEmail] && strings.Contains(text, "@") {
 		for _, m := range emailRe.FindAllString(text, -1) {
 			add(PIIEmail, m)
 		}
 	}
 	cards := map[string]bool{}
-	if enabled[PIICreditCard] || enabled[PIIPhone] {
+	if (enabled[PIICreditCard] || enabled[PIIPhone]) && digits >= 13 {
 		for _, m := range cardRe.FindAllString(text, -1) {
 			d := digitsOnly(m)
 			if len(d) >= 13 && len(d) <= 19 && luhn(d) {
@@ -124,21 +135,21 @@ func detectPII(text string, enabled map[string]bool) []piiFinding {
 			}
 		}
 	}
-	if enabled[PIISSN] {
+	if enabled[PIISSN] && digits >= 9 {
 		for _, m := range ssnRe.FindAllStringSubmatch(text, -1) {
 			if ssnValid(m) {
 				add(PIISSN, m[0])
 			}
 		}
 	}
-	if enabled[PIIIBAN] {
+	if enabled[PIIIBAN] && digits >= 4 {
 		for _, m := range ibanRe.FindAllString(text, -1) {
 			if ibanValid(m) {
 				add(PIIIBAN, m)
 			}
 		}
 	}
-	if enabled[PIIPhone] {
+	if enabled[PIIPhone] && digits >= 10 {
 		for _, m := range phoneRe.FindAllString(text, -1) {
 			d := digitsOnly(m)
 			if len(d) < 10 || len(d) > 15 || cards[d] {
@@ -152,10 +163,15 @@ func detectPII(text string, enabled map[string]bool) []piiFinding {
 		}
 	}
 	if enabled[PIIIP] {
-		for _, m := range ipv4Re.FindAllString(text, -1) {
-			if net.ParseIP(m) != nil {
-				add(PIIIP, m)
+		if digits >= 4 && strings.Contains(text, ".") {
+			for _, m := range ipv4Re.FindAllString(text, -1) {
+				if net.ParseIP(m) != nil {
+					add(PIIIP, m)
+				}
 			}
+		}
+		if strings.Count(text, ":") < 2 {
+			return out
 		}
 		for _, m := range ipv6Re.FindAllString(text, -1) {
 			if strings.Count(m, ":") >= 2 && strings.ContainsAny(m, "0123456789abcdefABCDEF") {
@@ -273,7 +289,7 @@ var apostropheReplacer = strings.NewReplacer("’", "'", "‘", "'", "ʼ", "'")
 // detectRefusal looks for refusal phrases near the start of the text (or
 // anywhere in short texts), where refusals almost always appear.
 func detectRefusal(text string, phrases []string) (string, bool) {
-	t := strings.ToLower(apostropheReplacer.Replace(strings.TrimSpace(text)))
+	t := strings.TrimSpace(text)
 	if t == "" {
 		return "", false
 	}
@@ -284,7 +300,18 @@ func detectRefusal(text string, phrases []string) (string, bool) {
 		}
 		t = t[:cut]
 	}
+	t = strings.ToLower(apostropheReplacer.Replace(t))
+	// Group phrases by a short prefix so absent prefixes skip whole groups.
+	absent := map[string]bool{}
 	for _, p := range phrases {
+		pre := p[:min(len(p), 4)]
+		if absent[pre] {
+			continue
+		}
+		if !strings.Contains(t, pre) {
+			absent[pre] = true
+			continue
+		}
 		if strings.Contains(t, p) {
 			return p, true
 		}
