@@ -1,0 +1,12 @@
+export { ChartFrame, EChart, type ChartFrameProps, type ChartTable, type EChartProps } from './chart'
+export { Heatmap, type HeatmapProps } from './heatmap'
+export { Histogram, type HistogramProps, type HistogramSeries } from './histogram'
+export { HorizontalBars, type BarItem, type HorizontalBarsProps } from './horizontal-bars'
+export { LatencyDistribution, type LatencyDistributionProps } from './latency-distribution'
+export { Scatter, type ScatterPoint, type ScatterProps } from './scatter'
+export { buildTheme, MAX_SERIES, readTokens, registerAirvalThemes, type ChartTokens } from './theme'
+export { TrendLine, type TrendLineProps, type TrendPoint, type TrendSeries } from './trend-line'
+export { binValues, formatValue, quantile, type ValueFormat } from './util'
+export { WinRateBar, type WinRateBarProps } from './win-rate-bar'
+/** Sparkline is pure SVG (cheap enough for table rows); re-exported here for discoverability. */
+export { Sparkline, type SparklineProps } from '@/components/ui/sparkline'
