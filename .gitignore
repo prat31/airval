@@ -1,0 +1,10 @@
+/bin/
+/dist/
+/airval-data/
+node_modules/
+web/dist/*
+!web/dist/.gitkeep
+*.db
+*.db-*
+.env
+coverage.out
