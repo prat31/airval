@@ -16,7 +16,11 @@ export interface BreadcrumbsProps {
   className?: string
 }
 
-/** Below the lg breakpoint only the current page is shown (the sidebar already locates the project). */
+/**
+ * Below the lg breakpoint only the current page is shown (the sidebar already locates the project).
+ * When space is tight only the first crumb (the project, also shown in the sidebar) truncates; the
+ * short collection crumbs and the current page stay whole.
+ */
 export function Breadcrumbs({ items, renderLink, className }: BreadcrumbsProps) {
   return (
     <nav aria-label="Breadcrumb" className={cn('min-w-0', className)}>
@@ -33,7 +37,7 @@ export function Breadcrumbs({ items, renderLink, className }: BreadcrumbsProps) 
             'flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 text-text-muted transition-colors hover:text-text focus-ring [&_svg]:size-3.5'
           return (
             <Fragment key={i}>
-              <li className={cn('flex min-w-0 items-center', last ? 'shrink' : 'shrink-[2] max-lg:hidden')}>
+              <li className={cn('flex min-w-0 items-center', last ? 'max-w-full shrink-0' : cn(i === 0 ? 'shrink' : 'shrink-0', 'max-lg:hidden'))}>
                 {last || !c.href ? (
                   <span aria-current={last ? 'page' : undefined} className={cn('flex min-w-0 items-center gap-1.5 px-1 [&_svg]:size-3.5', last ? 'font-medium text-text' : 'text-text-muted')}>
                     {content}

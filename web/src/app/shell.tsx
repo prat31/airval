@@ -296,42 +296,47 @@ function TopBar({ onToggleSidebar, onOpenPalette, onShortcuts }: { onToggleSideb
   const crumbs = useCrumbs()
   const { org, project } = useWorkspace()
   return (
-    <header className="flex h-(--topbar-height) shrink-0 items-center gap-2 border-b border-border bg-bg/80 px-3 backdrop-blur-sm">
-      <Tooltip content="Toggle sidebar" shortcut={['[']}>
-        <IconButton label="Toggle sidebar" size="sm" onClick={onToggleSidebar}>
-          <PanelLeft />
-        </IconButton>
-      </Tooltip>
-      <div className="mx-1 h-4 w-px bg-border" aria-hidden />
-      <Breadcrumbs
-        items={crumbs}
-        className="min-w-0 flex-1"
-        renderLink={(c, className, children) => (
-          <Link to={c.href!} className={className}>
-            {children}
-          </Link>
-        )}
-      />
-      <div className="flex shrink-0 items-center gap-1.5">
+    // Three columns: breadcrumbs | search | actions. The side columns share the leftover width equally,
+    // so the search stays centered at the same size on every page regardless of breadcrumb length.
+    // Below md the breadcrumbs give way and the search fills the bar.
+    <header className="flex h-(--topbar-height) shrink-0 items-center gap-2 border-b border-border bg-bg/80 px-3 backdrop-blur-sm md:grid md:grid-cols-[minmax(0,1fr)_minmax(16rem,1.4fr)_minmax(0,1fr)] md:gap-4">
+      <div className="flex min-w-0 shrink-0 items-center gap-2 md:shrink">
+        <Tooltip content="Toggle sidebar" shortcut={['[']}>
+          <IconButton label="Toggle sidebar" size="sm" onClick={onToggleSidebar}>
+            <PanelLeft />
+          </IconButton>
+        </Tooltip>
+        <div className="mx-1 hidden h-4 w-px bg-border md:block" aria-hidden />
+        <Breadcrumbs
+          items={crumbs}
+          className="hidden min-w-0 flex-1 md:flex"
+          renderLink={(c, className, children) => (
+            <Link to={c.href!} className={className}>
+              {children}
+            </Link>
+          )}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={onOpenPalette}
+        aria-label="Search or jump to"
+        className="mx-auto flex h-8 w-full min-w-0 max-w-2xl flex-1 items-center gap-2 rounded-md border border-border bg-surface pl-2.5 pr-1.5 text-sm text-text-muted transition-colors hover:border-border-strong hover:text-text-2 focus-ring"
+      >
+        <Search className="size-3.5 shrink-0" />
+        <span className="flex-1 truncate whitespace-nowrap text-left">Search or jump to…</span>
+        <span className="hidden shrink-0 gap-0.5 sm:flex">
+          <Kbd>{modKey}</Kbd>
+          <Kbd>K</Kbd>
+        </span>
+      </button>
+      <div className="flex shrink-0 items-center justify-end gap-1.5">
         {project && <LiveRunIndicator org={org.slug} project={project.slug} />}
-        <button
-          type="button"
-          onClick={onOpenPalette}
-          className="hidden h-7 w-56 items-center gap-2 rounded-md border border-border bg-surface pl-2 pr-1 text-sm text-text-muted transition-colors hover:border-border-strong hover:text-text-2 focus-ring md:flex"
-        >
-          <Search className="size-3.5" />
-          <span className="flex-1 truncate whitespace-nowrap text-left">Search or jump to…</span>
-          <span className="flex gap-0.5">
-            <Kbd>{modKey}</Kbd>
-            <Kbd>K</Kbd>
-          </span>
-        </button>
-        <IconButton label="Search" className="md:hidden" onClick={onOpenPalette}>
-          <Search />
-        </IconButton>
-        <ThemeToggle />
+        <div className="hidden sm:block">
+          <ThemeToggle />
+        </div>
         <Tooltip content="Keyboard shortcuts" shortcut={['?']}>
-          <IconButton label="Keyboard shortcuts" onClick={onShortcuts}>
+          <IconButton label="Keyboard shortcuts" className="hidden sm:inline-flex" onClick={onShortcuts}>
             <CircleHelp />
           </IconButton>
         </Tooltip>
