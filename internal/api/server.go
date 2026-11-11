@@ -213,7 +213,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 // requireAuth rejects anonymous calls to non-public operations.
 func (s *Server) requireAuth(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (any, error) {
-		rbac.ScopeFrom(ctx).SetOperation(operationID)
+		rbac.ScopeFrom(ctx).SetOperation(lowerFirst(operationID))
 		if !publicOps[operationID] && auth.FromContext(ctx) == nil {
 			return nil, rbac.ErrUnauthenticated
 		}
@@ -323,4 +323,12 @@ func (s *Server) audit(ctx context.Context, orgID uuid.UUID, action, target stri
 	for _, f := range sinks {
 		f(ctx, e)
 	}
+}
+
+// lowerFirst turns a generated Go operation name ("CreateDataset") back into the spec's operationId.
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToLower(s[:1]) + s[1:]
 }

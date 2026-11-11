@@ -52,7 +52,9 @@ func (s *Server) AddCallObserver(o ext.CallObserver) {
 func (s *Server) Authenticate(next http.Handler) http.Handler { return s.authenticate(next) }
 
 // WriteError renders err as an API error (exported for extension routes).
-func (s *Server) WriteError(w http.ResponseWriter, r *http.Request, err error) { s.writeError(w, r, err) }
+func (s *Server) WriteError(w http.ResponseWriter, r *http.Request, err error) {
+	s.writeError(w, r, err)
+}
 
 func (s *Server) GetEdition(_ context.Context, _ gen.GetEditionRequestObject) (gen.GetEditionResponseObject, error) {
 	s.mu.RLock()
@@ -86,24 +88,59 @@ func (s *Server) ListAuthProviders(ctx context.Context, _ gen.ListAuthProvidersR
 	return gen.ListAuthProviders200JSONResponse{Items: items}, nil
 }
 
-// eeRoutes registers a 501 handler on every documented enterprise endpoint (OpenAPI tag "ee"); extension
-// routes registered later replace them.
+// EERoutes are the documented enterprise endpoints (OpenAPI tag "ee"; kept in sync with api/openapi.yaml by
+// TestEERoutesMatchSpec). Core answers 501 on them; extension routes registered later replace the handlers.
+var EERoutes = [][2]string{
+	{"GET", "/v1/auth/saml/{provider}/metadata"},
+	{"GET", "/v1/auth/saml/{provider}/start"},
+	{"POST", "/v1/auth/saml/{provider}/acs"},
+	{"GET", "/v1/orgs/{org}/sso-providers"},
+	{"POST", "/v1/orgs/{org}/sso-providers"},
+	{"GET", "/v1/orgs/{org}/sso-providers/{id}"},
+	{"PATCH", "/v1/orgs/{org}/sso-providers/{id}"},
+	{"DELETE", "/v1/orgs/{org}/sso-providers/{id}"},
+	{"GET", "/v1/orgs/{org}/scim-tokens"},
+	{"POST", "/v1/orgs/{org}/scim-tokens"},
+	{"DELETE", "/v1/orgs/{org}/scim-tokens/{id}"},
+	{"GET", "/v1/orgs/{org}/scim-settings"},
+	{"PUT", "/v1/orgs/{org}/scim-settings"},
+	{"GET", "/v1/orgs/{org}/roles"},
+	{"POST", "/v1/orgs/{org}/roles"},
+	{"PATCH", "/v1/orgs/{org}/roles/{id}"},
+	{"DELETE", "/v1/orgs/{org}/roles/{id}"},
+	{"GET", "/v1/orgs/{org}/role-assignments"},
+	{"PUT", "/v1/orgs/{org}/role-assignments"},
+	{"DELETE", "/v1/orgs/{org}/role-assignments"},
+	{"GET", "/v1/orgs/{org}/audit-log/export"},
+	{"GET", "/v1/orgs/{org}/audit-settings"},
+	{"PUT", "/v1/orgs/{org}/audit-settings"},
+	{"GET", "/v1/orgs/{org}/retention-policies"},
+	{"GET", "/v1/projects/{project}/retention-policy"},
+	{"PUT", "/v1/projects/{project}/retention-policy"},
+	{"DELETE", "/v1/projects/{project}/retention-policy"},
+	{"GET", "/v1/orgs/{org}/branding"},
+	{"PUT", "/v1/orgs/{org}/branding"},
+	{"GET", "/scim/v2/Users"},
+	{"POST", "/scim/v2/Users"},
+	{"GET", "/scim/v2/Users/{id}"},
+	{"PUT", "/scim/v2/Users/{id}"},
+	{"PATCH", "/scim/v2/Users/{id}"},
+	{"DELETE", "/scim/v2/Users/{id}"},
+	{"GET", "/scim/v2/Groups"},
+	{"POST", "/scim/v2/Groups"},
+	{"GET", "/scim/v2/Groups/{id}"},
+	{"PUT", "/scim/v2/Groups/{id}"},
+	{"PATCH", "/scim/v2/Groups/{id}"},
+	{"DELETE", "/scim/v2/Groups/{id}"},
+}
+
 func (s *Server) eeRoutes(r chi.Router) {
-	spec, err := gen.GetSwagger()
-	if err != nil {
-		s.Logger.Warn("api: load embedded spec", "err", err)
-		return
-	}
 	h := func(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, errorf(http.StatusNotImplemented, "enterprise_required",
 			"this feature requires the airval enterprise edition"))
 	}
-	for path, item := range spec.Paths.Map() {
-		for method, op := range item.Operations() {
-			if slices.Contains(op.Tags, "ee") {
-				r.Method(method, path, http.HandlerFunc(h))
-			}
-		}
+	for _, rt := range EERoutes {
+		r.Method(rt[0], rt[1], http.HandlerFunc(h))
 	}
 }
 
