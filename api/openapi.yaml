@@ -428,6 +428,15 @@ paths:
       responses:
         "204": { description: Deleted }
         default: { $ref: "#/components/responses/Error" }
+  /v1/projects/{project}/overview:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [projects]
+      operationId: getProjectOverview
+      summary: Stat tiles for the project overview (runs, latest pass rate, average score, spend, failing gates)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectOverview" } } } }
+        default: { $ref: "#/components/responses/Error" }
   /v1/projects/{project}/trends:
     parameters: [{ $ref: "#/components/parameters/ProjectID" }]
     get:
@@ -512,8 +521,9 @@ paths:
       tags: [targets]
       operationId: testTarget
       summary: Send one example to the target ("Test connection") and show raw request/response with mapping applied
+      description: Uses `example`, else the first example of `dataset_id`, else a built-in sample. Secrets are resolved server-side and redacted in the report.
       requestBody:
-        required: true
+        required: false
         content: { application/json: { schema: { $ref: "#/components/schemas/TargetTestRequest" } } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TargetTestResult" } } } }
@@ -623,7 +633,15 @@ paths:
     post:
       tags: [datasets]
       operationId: importDataset
-      summary: Import examples from CSV/JSONL/JSON/Parquet (upload or URL) or a public Hugging Face dataset, with column mapping. `preview=true` returns parsed rows without writing.
+      summary: Import examples from CSV/JSONL/JSON/Parquet (multipart upload or inline text) or a public Hugging Face dataset, with column mapping.
+      description: |
+        Two phases. `?preview=true` parses the first rows without writing and returns `source_preview` (columns, inferred
+        types, sample rows) plus a `suggested_mapping`; when a `mapping` is also sent, `preview` holds the mapped examples.
+        Without `preview`, the source is streamed in batches into the dataset draft (`mode: replace` clears the draft first)
+        and the result carries the counts; `publish: true` also publishes a version. Uploads are limited by
+        `server.max_upload_mb`. To commit an upload, send the same file again with the mapping in `options`.
+      parameters:
+        - { name: preview, in: query, schema: { type: boolean, default: false } }
       requestBody:
         required: true
         content:
@@ -634,7 +652,7 @@ paths:
               required: [file]
               properties:
                 file: { type: string, format: binary }
-                options: { type: string, description: "JSON-encoded DatasetImportRequest (without source.url/hf)" }
+                options: { type: string, description: "JSON-encoded DatasetImportRequest (mapping, mode, tags, publish, source.format/limit)" }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DatasetImportResult" } } } }
         default: { $ref: "#/components/responses/Error" }
@@ -734,6 +752,14 @@ paths:
       responses:
         "204": { description: Deleted }
         default: { $ref: "#/components/responses/Error" }
+  /v1/evaluators/catalog:
+    get:
+      tags: [evaluators]
+      operationId: getEvaluatorCatalog
+      summary: Every evaluator kind with its category, defaults and config schema (renders the evaluator forms)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/EvaluatorCatalog" } } } }
+        default: { $ref: "#/components/responses/Error" }
   /v1/evaluators/{evaluator}/agreement:
     parameters: [{ $ref: "#/components/parameters/EvaluatorID" }]
     get:
@@ -821,6 +847,18 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/GateCreate" } } }
       responses:
         "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Gate" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/suites/{suite}/gates:validate:
+    parameters: [{ $ref: "#/components/parameters/SuiteID" }]
+    post:
+      tags: [suites]
+      operationId: validateGate
+      summary: Parse and check a gate (text or AST) against the suite's evaluators without saving (live validation in the gate builder)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/GateValidateRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/GateValidateResult" } } } }
         default: { $ref: "#/components/responses/Error" }
   /v1/suites/{suite}/gates/{gate}:
     parameters: [{ $ref: "#/components/parameters/SuiteID" }, { name: gate, in: path, required: true, schema: { type: string, format: uuid } }]
@@ -1021,10 +1059,16 @@ paths:
       tags: [comparisons]
       operationId: compareRuns
       summary: Compare 2–4 runs (first run is the baseline)
+      description: |
+        Scorecard cells carry deltas vs the baseline with a paired bootstrap confidence interval; `regressions` and
+        `improvements` are ranked per-example deltas for the chosen evaluator (paginate with `offset`/`limit`, totals in
+        `regressions_total`/`improvements_total`); `rows` aligns every example's score across all runs (most changed first).
       parameters:
         - { name: runs, in: query, required: true, style: form, explode: false, schema: { type: array, minItems: 2, maxItems: 4, items: { type: string, format: uuid } } }
         - { name: evaluator_id, in: query, description: Evaluator used to rank regressions (default first common), schema: { type: string, format: uuid } }
-        - { name: limit, in: query, description: Max regressions/improvements returned, schema: { type: integer, default: 50, maximum: 500 } }
+        - { name: against, in: query, description: Run (one of `runs`) whose regressions/improvements and scatter are listed against the baseline (default the second run), schema: { type: string, format: uuid } }
+        - { name: limit, in: query, description: Page size for regressions/improvements/rows, schema: { type: integer, default: 50, maximum: 500 } }
+        - { name: offset, in: query, description: Offset into the ranked regressions/improvements/rows lists, schema: { type: integer, default: 0, minimum: 0 } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ComparisonReport" } } } }
         default: { $ref: "#/components/responses/Error" }
@@ -1588,109 +1632,132 @@ components:
       additionalProperties: true
       x-go-type: json.RawMessage
       description: |
-        Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
-        Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
-      properties:
-        http: { $ref: "#/components/schemas/HttpTargetConfig" }
-        openai: { $ref: "#/components/schemas/OpenAITargetConfig" }
-        anthropic: { $ref: "#/components/schemas/AnthropicTargetConfig" }
-        bedrock: { $ref: "#/components/schemas/BedrockTargetConfig" }
-        vertex: { $ref: "#/components/schemas/VertexTargetConfig" }
-        conversation: { $ref: "#/components/schemas/ConversationConfig" }
-        limits: { $ref: "#/components/schemas/TargetLimits" }
-        cache: { $ref: "#/components/schemas/CachePolicy" }
-        variables: { type: object, additionalProperties: { type: string }, description: Default template variables (overridable per run / by webhooks) }
+        Versioned target configuration, flat and specific to `kind` (see HttpTargetConfig, OpenAITargetConfig,
+        AnthropicTargetConfig, BedrockTargetConfig, VertexTargetConfig; `agent` takes the HttpTargetConfig fields and needs
+        a `response.trace` or `response.tool_calls` mapping). The server validates it strictly on create/update
+        (unknown fields are rejected) and returns 400 `validation_failed` with `details.field`.
+        Strings are Go templates: `{{ .input.question }}`, `{{ secret "KEY" }}`. Secret values never appear in test output.
     HttpTargetConfig:
       type: object
-      additionalProperties: true
       required: [url]
       properties:
-        method: { type: string, enum: [GET, POST, PUT, PATCH], default: POST }
+        method: { type: string, enum: [GET, POST, PUT, PATCH, DELETE], default: POST }
         url: { type: string }
         headers: { type: object, additionalProperties: { type: string } }
-        query: { type: object, additionalProperties: { type: string } }
         body: { type: string, description: Request body template (usually JSON) }
-        streaming: { type: string, enum: [none, sse, ndjson], default: none }
-        timeout_ms: { type: integer, default: 60000 }
-        retries: { type: integer, default: 2 }
+        expect_status: { type: array, items: { type: integer }, description: Accepted status codes (default any 2xx) }
         response: { $ref: "#/components/schemas/ResponseMapping" }
+        stream:
+          type: object
+          required: [mode, delta_path]
+          properties:
+            mode: { type: string, enum: [sse, ndjson] }
+            delta_path: { type: string }
+            done_sentinel: { type: string }
+            event: { type: string }
+        session: { type: object, required: [path], properties: { path: { type: string } } }
+        timeout_ms: { type: integer, default: 60000 }
+        max_response_bytes: { type: integer, format: int64 }
+        max_concurrency: { type: integer }
         tls: { $ref: "#/components/schemas/TLSConfig" }
     ResponseMapping:
       type: object
-      additionalProperties: true
       description: JSONPath expressions applied to the response body
       properties:
         output: { type: string, example: "$.choices[0].message.content" }
         output_json: { type: string }
         context: { type: string, description: "Path to an array of retrieved passages" }
-        tool_calls: { type: string }
-        trace: { type: string, description: "agent: path to intermediate steps" }
-        usage_input_tokens: { type: string }
-        usage_output_tokens: { type: string }
+        tool_calls:
+          type: object
+          required: [path]
+          properties: { path: { type: string }, id: { type: string }, name: { type: string }, arguments: { type: string }, result: { type: string } }
+        trace:
+          type: object
+          required: [path]
+          properties: { path: { type: string }, kind: { type: string }, name: { type: string }, input: { type: string }, output: { type: string }, duration_ms: { type: string } }
+        input_tokens: { type: string }
+        output_tokens: { type: string }
         cost_usd: { type: string }
-        session_id: { type: string, description: Multi-turn session id to feed back }
-        stream_delta: { type: string, description: Path of the text delta inside each SSE/NDJSON chunk }
     TLSConfig:
       type: object
-      additionalProperties: true
+      description: PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
       properties:
+        ca_cert: { type: string }
+        client_cert: { type: string }
+        client_key: { type: string }
+        server_name: { type: string }
         insecure_skip_verify: { type: boolean }
-        ca_cert_secret: { type: string }
-        client_cert_secret: { type: string }
-        client_key_secret: { type: string }
     LLMSamplingConfig:
       type: object
-      additionalProperties: true
+      required: [model]
       properties:
         model: { type: string }
         system_prompt: { type: string }
-        prompt_template: { type: string, description: "User message template (default: {{ .input.input }} or the JSON of input)" }
+        user_template: { type: string, description: "User message template (default: the lone string in the input, else its JSON)" }
         temperature: { type: number, format: double }
         max_tokens: { type: integer }
-        top_p: { type: number, format: double }
-        tools: { type: array, items: { $ref: "#/components/schemas/JSONObject" } }
-        json_mode: { type: boolean }
-        extra_body: { $ref: "#/components/schemas/JSONObject" }
+        pricing: { type: object, properties: { input_per_1m: { type: number, format: double }, output_per_1m: { type: number, format: double } } }
+        timeout_ms: { type: integer }
+        max_response_bytes: { type: integer, format: int64 }
+        max_concurrency: { type: integer }
+        tls: { $ref: "#/components/schemas/TLSConfig" }
     OpenAITargetConfig:
       allOf:
         - $ref: "#/components/schemas/LLMSamplingConfig"
         - type: object
-          additionalProperties: true
           properties:
             base_url: { type: string, default: "https://api.openai.com/v1" }
-            api_key_secret: { type: string }
-            organization: { type: string }
-            api_version: { type: string, description: Azure OpenAI api-version }
-            deployment: { type: string, description: Azure OpenAI deployment }
+            path: { type: string, default: /chat/completions }
+            api_key: { type: string, description: 'Template, e.g. {{ secret "OPENAI_KEY" }}' }
+            auth_header: { type: string }
+            headers: { type: object, additionalProperties: { type: string } }
+            query: { type: object, additionalProperties: { type: string } }
+            max_tokens_param: { type: string }
+            tools: { type: array, items: { $ref: "#/components/schemas/JSONObject" } }
+            tool_choice: { $ref: "#/components/schemas/JSONValue" }
+            response_format: { $ref: "#/components/schemas/JSONObject" }
+            extra_body: { $ref: "#/components/schemas/JSONObject" }
+            stream: { type: boolean }
     AnthropicTargetConfig:
       allOf:
         - $ref: "#/components/schemas/LLMSamplingConfig"
         - type: object
-          additionalProperties: true
           properties:
             base_url: { type: string, default: "https://api.anthropic.com" }
-            api_key_secret: { type: string }
+            api_key: { type: string }
             anthropic_version: { type: string }
+            anthropic_beta: { type: string }
+            headers: { type: object, additionalProperties: { type: string } }
+            tools: { type: array, items: { $ref: "#/components/schemas/JSONObject" } }
+            tool_choice: { $ref: "#/components/schemas/JSONValue" }
+            extra_body: { $ref: "#/components/schemas/JSONObject" }
+            stream: { type: boolean }
     BedrockTargetConfig:
       allOf:
         - $ref: "#/components/schemas/LLMSamplingConfig"
         - type: object
-          additionalProperties: true
+          required: [region, access_key_id, secret_access_key]
           properties:
             region: { type: string }
-            model_id: { type: string }
-            access_key_id_secret: { type: string }
-            secret_access_key_secret: { type: string }
-            session_token_secret: { type: string }
+            endpoint: { type: string }
+            access_key_id: { type: string }
+            secret_access_key: { type: string }
+            session_token: { type: string }
+            tool_config: { $ref: "#/components/schemas/JSONObject" }
+            additional_model_request_fields: { $ref: "#/components/schemas/JSONObject" }
+            extra_body: { $ref: "#/components/schemas/JSONObject" }
     VertexTargetConfig:
       allOf:
         - $ref: "#/components/schemas/LLMSamplingConfig"
         - type: object
-          additionalProperties: true
           properties:
-            project: { type: string }
+            base_url: { type: string }
+            project_id: { type: string, description: Set for Vertex AI; omit for the Gemini API }
             location: { type: string }
-            credentials_secret: { type: string, description: Service account JSON }
+            api_key: { type: string }
+            access_token: { type: string }
+            tools: { type: array, items: { $ref: "#/components/schemas/JSONObject" } }
+            extra_body: { $ref: "#/components/schemas/JSONObject" }
     ConversationConfig:
       type: object
       additionalProperties: true
@@ -1766,6 +1833,7 @@ components:
       type: object
       properties:
         example: { $ref: "#/components/schemas/ExampleData" }
+        dataset_id: { type: string, format: uuid, description: Use the first example of this dataset (draft) as the sample }
         variables: { type: object, additionalProperties: { type: string } }
     TargetDraftTestRequest:
       type: object
@@ -1774,17 +1842,32 @@ components:
         kind: { $ref: "#/components/schemas/TargetKind" }
         config: { $ref: "#/components/schemas/TargetConfig" }
         example: { $ref: "#/components/schemas/ExampleData" }
+        dataset_id: { type: string, format: uuid }
         variables: { type: object, additionalProperties: { type: string } }
     TargetTestResult:
       type: object
-      required: [ok]
+      required: [ok, latency_ms]
       properties:
         ok: { type: boolean }
         error: { type: string }
+        error_class: { type: string, description: "permanent | transient | rate_limited | ... (empty when ok)" }
+        retry_after_ms: { type: integer, format: int64 }
+        latency_ms: { type: number, format: double }
         request: { $ref: "#/components/schemas/JSONValue" }
         raw_response: { $ref: "#/components/schemas/JSONValue" }
         status_code: { type: integer }
         response: { $ref: "#/components/schemas/TargetResponse" }
+        mapping:
+          type: array
+          description: One row per configured response JSONPath, showing whether it matched
+          items:
+            type: object
+            required: [field, path, matched]
+            properties:
+              field: { type: string }
+              path: { type: string }
+              matched: { type: boolean }
+              value: { $ref: "#/components/schemas/JSONValue" }
     TargetResponse:
       type: object
       description: What a target returned for one example (mirrors the execution pipeline's Response)
@@ -1967,42 +2050,71 @@ components:
       enum: [csv, jsonl, json, parquet]
     ColumnMapping:
       type: object
-      description: Maps source columns to example fields. Unmapped columns go to metadata when `rest_to_metadata`.
+      description: Maps source columns to example fields (the importer's mapping, verbatim).
       properties:
-        input: { type: array, items: { type: string }, description: "Columns that become input fields (name preserved)" }
-        expected: { type: string }
-        context: { type: string }
-        metadata: { type: array, items: { type: string } }
-        tags: { type: string, description: Column with comma-separated tags }
-        conversation: { type: string }
-        rest_to_metadata: { type: boolean }
+        input_columns: { type: object, additionalProperties: { type: string }, description: "source column -> input key" }
+        whole_row_as_input: { type: boolean, description: Put every column not mapped elsewhere into input }
+        id_column: { type: string }
+        expected_column: { type: string }
+        context_column: { type: string }
+        context_delimiter: { type: string }
+        tags_column: { type: string }
+        tags_delimiter: { type: string }
+        metadata_columns: { type: array, items: { type: string } }
+        conversation_column: { type: string, description: "OpenAI-style messages array" }
     DatasetImportRequest:
       type: object
       properties:
         source:
           type: object
           properties:
-            kind: { type: string, enum: [upload, url, huggingface, inline] }
-            url: { type: string }
+            kind: { type: string, enum: [upload, huggingface, inline] }
             format: { $ref: "#/components/schemas/DatasetImportFormat" }
             data: { type: string, description: "inline: pasted CSV/JSONL/JSON" }
             hf_repo: { type: string, description: "huggingface: repo id, e.g. openai/gsm8k" }
             hf_config: { type: string }
             hf_split: { type: string, default: train }
-            limit: { type: integer }
+            limit: { type: integer, description: Import at most this many rows }
         mapping: { $ref: "#/components/schemas/ColumnMapping" }
         mode: { type: string, enum: [append, replace], default: append }
         tags: { type: array, items: { type: string }, description: Tags added to every imported example }
-        preview: { type: boolean, description: Parse and return up to 20 mapped rows without writing }
+        preview: { type: boolean, description: Same as the `preview` query parameter }
         publish: { type: boolean, description: Publish a version after importing }
+    DatasetPreview:
+      type: object
+      required: [format, columns, rows, total_estimate, total_exact]
+      properties:
+        format: { type: string }
+        columns:
+          type: array
+          items:
+            type: object
+            required: [name, inferred_type, sample_values]
+            properties:
+              name: { type: string }
+              inferred_type: { type: string, description: "string|int|float|bool|array|object|messages|null" }
+              sample_values: { type: array, items: { $ref: "#/components/schemas/JSONValue" } }
+        rows: { type: array, items: { type: array, items: { $ref: "#/components/schemas/JSONValue" } }, description: Aligned with columns }
+        total_estimate: { type: integer, format: int64, description: "-1 when unknown" }
+        total_exact: { type: boolean }
+        row_errors: { type: array, items: { $ref: "#/components/schemas/ImportRowError" } }
+    ImportRowError:
+      type: object
+      required: [row, message]
+      properties: { row: { type: integer }, message: { type: string } }
     DatasetImportResult:
       type: object
-      required: [count]
+      required: [count, total, failed]
       properties:
         count: { type: integer, description: Examples written (0 for preview) }
+        total: { type: integer, description: Source rows read }
+        failed: { type: integer, description: Rows skipped }
         columns: { type: array, items: { type: string } }
-        preview: { type: array, items: { $ref: "#/components/schemas/ExampleData" } }
-        errors: { type: array, items: { type: object, required: [row, message], properties: { row: { type: integer }, message: { type: string } } } }
+        preview: { type: array, items: { $ref: "#/components/schemas/ExampleData" }, description: Mapped examples (preview with a mapping) }
+        source_preview: { $ref: "#/components/schemas/DatasetPreview" }
+        suggested_mapping: { $ref: "#/components/schemas/ColumnMapping" }
+        errors: { type: array, items: { $ref: "#/components/schemas/ImportRowError" } }
+        errors_truncated: { type: boolean }
         version: { $ref: "#/components/schemas/DatasetVersion" }
     DatasetVersion:
       type: object
@@ -2042,7 +2154,7 @@ components:
       type: object
       additionalProperties: true
       x-go-type: json.RawMessage
-      description: Kind-specific options. Only the fields relevant to the kind are used.
+      description: Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative.
       properties:
         field: { type: string, description: "What to score: output (default), output_json, context, transcript, or a JSONPath into the output" }
         value: { $ref: "#/components/schemas/JSONValue" }
@@ -2128,16 +2240,45 @@ components:
         config: { $ref: "#/components/schemas/EvaluatorConfig" }
         example: { $ref: "#/components/schemas/ExampleData" }
         response: { $ref: "#/components/schemas/TargetResponse" }
+    EvaluatorCatalog:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/EvaluatorKindInfo" } }
+    EvaluatorKindInfo:
+      type: object
+      required: [kind, name, category, group, description, cost, default_threshold, config_schema, apply_to]
+      properties:
+        kind: { type: string }
+        name: { type: string }
+        category: { type: string, enum: [deterministic, model, human] }
+        group: { type: string }
+        description: { type: string }
+        cost: { type: string, description: "free | cheap | moderate | expensive" }
+        default_threshold: { type: number, format: double }
+        config_schema: { $ref: "#/components/schemas/JSONObject" }
+        apply_to: { type: array, items: { $ref: "#/components/schemas/ApplyTo" } }
+        requires: { type: array, items: { type: string } }
+        prompt_version: { type: string }
+        prompt: { type: string, description: Judge prompt template shown to users }
     EvaluatorAgreement:
       type: object
       required: [evaluator_id, n]
       properties:
         evaluator_id: { type: string, format: uuid }
         n: { type: integer, description: Results with both a score and a human annotation }
-        cohens_kappa: { type: number, format: double, nullable: true }
+        n_binary: { type: integer, description: Pairs with a pass/fail verdict on both sides }
+        n_numeric: { type: integer, description: Pairs with a numeric value on both sides }
+        cohens_kappa: { type: number, format: double, nullable: true, description: Over pass/fail verdicts }
         percent_agreement: { type: number, format: double, nullable: true }
+        pearson: { type: number, format: double, nullable: true, description: Over numeric values }
         mean_abs_error: { type: number, format: double, nullable: true }
-
+        judge_pass_rate: { type: number, format: double, nullable: true }
+        human_pass_rate: { type: number, format: double, nullable: true }
+        confusion:
+          type: object
+          description: Human verdict (rows) vs evaluator verdict (columns), pass = positive
+          properties: { tp: { type: integer }, fp: { type: integer }, fn: { type: integer }, tn: { type: integer } }
     # ------------------------------------------------------------ suites, gates, triggers
     Severity:
       type: string
@@ -2231,20 +2372,20 @@ components:
       type: object
       x-go-type: json.RawMessage
       description: |
-        Gate expression AST. Logical nodes (`and`, `or`, `not`) have `args`; `compare` nodes compute
-        `fn(metric[, evaluator][, selector][, tag]) comparator value`. Examples:
-        mean(faithfulness) >= 0.85 → {op:compare, fn:mean, metric:evaluator, evaluator_id, comparator:">=", value:0.85};
-        count(critical_fail) == 0 → {op:compare, fn:count, metric:results, selector:critical_fail, comparator:"==", value:0}.
+        Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+        `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+        `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+        evaluator name or slug and the server rewrites it. Example for
+        `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+        {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+        {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
       required: [op]
       properties:
-        op: { type: string, enum: [and, or, not, compare] }
+        op: { type: string, enum: [and, or, not, cmp, call, num] }
         args: { type: array, items: { $ref: "#/components/schemas/GateExpr" } }
-        fn: { type: string, enum: [mean, pass_rate, count, sum, min, max, stddev, p50, p90, p95, p99, regression_vs_baseline] }
-        metric: { type: string, enum: [evaluator, results, latency_ms, ttft_ms, cost_usd, tokens] }
-        evaluator_id: { type: string, format: uuid }
-        selector: { type: string, enum: [all, passed, failed, errored, critical_fail, major_fail, minor_fail] }
-        tag: { type: string, description: Restrict to examples with this tag }
-        comparator: { type: string, enum: [">=", ">", "<=", "<", "==", "!="] }
+        cmp: { type: string, enum: [">=", ">", "<=", "<", "==", "!="] }
+        func: { type: string, enum: [mean, median, p50, p90, p95, p99, min, max, stddev, sum, pass_rate, count, regression_vs_baseline] }
+        params: { type: array, items: { type: string } }
         value: { type: number, format: double }
     Gate:
       type: object
@@ -2265,15 +2406,33 @@ components:
         items: { type: array, items: { $ref: "#/components/schemas/Gate" } }
     GateCreate:
       type: object
-      required: [expr]
+      description: Send `text` (e.g. `mean(faithfulness) >= 0.85`) or `expr` (the AST); exactly one.
       properties:
         name: { type: string }
+        text: { type: string }
         expr: { $ref: "#/components/schemas/GateExpr" }
         enabled: { type: boolean, default: true }
+    GateValidateRequest:
+      type: object
+      properties:
+        text: { type: string }
+        expr: { $ref: "#/components/schemas/GateExpr" }
+    GateValidateResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        expr: { $ref: "#/components/schemas/GateExpr" }
+        text: { type: string, description: Canonical rendering }
+        evaluators: { type: array, items: { type: string }, description: Evaluator names the expression references }
+        error: { type: string }
+        position: { type: integer, description: Character offset of a text parse error (0-based) }
+        suggestion: { type: string }
     GateUpdate:
       type: object
       properties:
         name: { type: string }
+        text: { type: string }
         expr: { $ref: "#/components/schemas/GateExpr" }
         enabled: { type: boolean }
     TriggerKind:
@@ -2534,6 +2693,20 @@ components:
         run_id: { type: string, format: uuid }
         at: { type: string, format: date-time }
         data: { $ref: "#/components/schemas/JSONObject" }
+    ProjectOverview:
+      type: object
+      required: [runs_7d, runs_prev_7d, spend_7d_usd, failing_gates]
+      properties:
+        runs_7d: { type: integer, description: Runs created in the last 7 days }
+        runs_prev_7d: { type: integer, description: Runs created in the 7 days before that }
+        latest_run: { $ref: "#/components/schemas/Run" }
+        latest_pass_rate: { type: number, format: double, nullable: true, description: Pass rate of the latest finished run (0..1) }
+        pass_rate_delta: { type: number, format: double, nullable: true, description: Change vs the previous finished run of the same suite }
+        avg_score: { type: number, format: double, nullable: true, description: Mean of the latest finished run's evaluator means }
+        spend_7d_usd: { type: number, format: double }
+        spend_prev_7d_usd: { type: number, format: double }
+        failing_gates: { type: integer, description: Suites whose latest finished run failed its gate }
+        failing_suites: { type: array, items: { type: object, required: [suite_id, run_id], properties: { suite_id: { type: string, format: uuid }, name: { type: string }, run_id: { type: string, format: uuid } } } }
     TrendMetric:
       type: string
       enum: [pass_rate, score_mean, latency_p50, latency_p95, cost_usd, tokens]
@@ -2595,6 +2768,11 @@ components:
         pass_rate: { type: number, format: double, nullable: true }
         delta_mean: { type: number, format: double, nullable: true, description: vs the first run }
         delta_pass_rate: { type: number, format: double, nullable: true }
+        ci_low: { type: number, format: double, nullable: true, description: Paired bootstrap interval of the mean delta }
+        ci_high: { type: number, format: double, nullable: true }
+        p_value: { type: number, format: double, nullable: true }
+        significant: { type: boolean, description: The interval excludes zero }
+        paired: { type: integer, description: Examples scored in both this run and the baseline }
     ScorecardRow:
       type: object
       required: [key, label, cells]
@@ -2612,27 +2790,59 @@ components:
         value: { type: number, format: double, nullable: true }
         passed: { type: boolean, nullable: true }
         output: { type: string }
-    ExampleDelta:
-      type: object
-      required: [example_id, delta, cells]
-      properties:
-        example_id: { type: string, format: uuid }
-        input: { $ref: "#/components/schemas/JSONObject" }
-        expected: { $ref: "#/components/schemas/JSONValue" }
-        delta: { type: number, format: double, description: Last run's score minus the first run's }
-        cells: { type: array, items: { $ref: "#/components/schemas/ExampleDeltaCell" } }
     ComparisonReport:
       type: object
       required: [runs, scorecard, regressions, improvements]
       properties:
         runs: { type: array, items: { $ref: "#/components/schemas/Run" } }
-        evaluator_id: { type: string, format: uuid }
+        evaluator_id: { type: string, format: uuid, description: Evaluator used for regressions, improvements, scatter and rows }
+        evaluators: { type: array, items: { type: object, required: [id, name], properties: { id: { type: string, format: uuid }, name: { type: string } } }, description: Evaluators present in the baseline and at least one other run }
+        against_run_id: { type: string, format: uuid }
         scorecard: { type: array, items: { $ref: "#/components/schemas/ScorecardRow" } }
         regressions: { type: array, items: { $ref: "#/components/schemas/ExampleDelta" } }
+        regressions_total: { type: integer }
         improvements: { type: array, items: { $ref: "#/components/schemas/ExampleDelta" } }
+        improvements_total: { type: integer }
         scatter: { type: array, items: { type: object, required: [example_id, a, b], properties: { example_id: { type: string, format: uuid }, a: { type: number, format: double }, b: { type: number, format: double } } } }
-        pairwise: { type: object, properties: { wins: { type: integer }, ties: { type: integer }, losses: { type: integer } } }
-
+        rows: { type: array, items: { $ref: "#/components/schemas/ComparisonRow" } }
+        rows_total: { type: integer }
+        pairwise: { type: array, items: { $ref: "#/components/schemas/PairwiseSummary" }, description: Win rate of each pairwise-scored run, when present }
+    ExampleDelta:
+      type: object
+      required: [example_id, baseline, candidate, delta]
+      properties:
+        example_id: { type: string, format: uuid }
+        input_preview: { type: string }
+        baseline: { type: number, format: double }
+        candidate: { type: number, format: double }
+        delta: { type: number, format: double }
+        baseline_passed: { type: boolean, nullable: true }
+        candidate_passed: { type: boolean, nullable: true }
+    ComparisonRow:
+      type: object
+      required: [example_id, cells]
+      properties:
+        example_id: { type: string, format: uuid }
+        input_preview: { type: string }
+        cells:
+          type: array
+          description: One per compared run, same order as `runs`; absent value = example not scored in that run
+          items:
+            type: object
+            required: [run_id]
+            properties:
+              run_id: { type: string, format: uuid }
+              value: { type: number, format: double, nullable: true }
+              passed: { type: boolean, nullable: true }
+    PairwiseSummary:
+      type: object
+      required: [run_id, wins, ties, losses, win_rate]
+      properties:
+        run_id: { type: string, format: uuid }
+        wins: { type: integer }
+        ties: { type: integer }
+        losses: { type: integer }
+        win_rate: { type: number, format: double, description: (wins + ties/2) / decided }
     # ------------------------------------------------------------ review
     ReviewQueueConfig:
       type: object

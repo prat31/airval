@@ -66,6 +66,8 @@ type Server struct {
 	ShutdownTimeout time.Duration `koanf:"shutdown_timeout" yaml:"shutdown_timeout"`
 	// UIDir serves the UI from disk instead of the embedded build (frontend development).
 	UIDir string `koanf:"ui_dir" yaml:"ui_dir"`
+	// MaxUploadMB caps dataset import uploads (default 512).
+	MaxUploadMB int `koanf:"max_upload_mb" yaml:"max_upload_mb"`
 }
 
 type Auth struct {
@@ -136,6 +138,7 @@ func defaults(mode Mode) map[string]any {
 		"server.addr":               ":8080",
 		"server.base_url":           "http://localhost:8080",
 		"server.shutdown_timeout":   "20s",
+		"server.max_upload_mb":      512,
 		"auth.session_ttl":          "720h",
 		"auth.cookie_secure":        false,
 		"workers.concurrency":       256,

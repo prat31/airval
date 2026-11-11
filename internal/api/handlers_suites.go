@@ -3,8 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -59,6 +57,9 @@ func (s *Server) CreateSuite(ctx context.Context, req gen.CreateSuiteRequestObje
 	if err != nil {
 		return nil, err
 	}
+	if err := s.validateSuiteConfig(ctx, p.ID, cfg); err != nil {
+		return nil, err
+	}
 	x := store.Suite{OrgID: p.OrgID, ProjectID: p.ID, Name: strings.TrimSpace(b.Name), Slug: trimmed(b.Slug),
 		Description: trimmed(b.Description), Config: cfg}
 	if x.Slug == "" {
@@ -108,6 +109,9 @@ func (s *Server) UpdateSuite(ctx context.Context, req gen.UpdateSuiteRequestObje
 			if x.Config, err = jsonObject(*b.Config, "config"); err != nil {
 				return nil, err
 			}
+			if err := s.validateSuiteConfig(ctx, x.ProjectID, x.Config); err != nil {
+				return nil, err
+			}
 		}
 		if b.BaselineRunId != nil {
 			r, err := s.Store.GetRun(ctx, *b.BaselineRunId)
@@ -134,28 +138,6 @@ func (s *Server) DeleteSuite(ctx context.Context, req gen.DeleteSuiteRequestObje
 	return gen.DeleteSuite204Response{}, nil
 }
 
-// ---- gates ----
-
-// gateNode mirrors the GateExpr schema.
-type gateNode struct {
-	Op          string     `json:"op"`
-	Args        []gateNode `json:"args,omitempty"`
-	Fn          string     `json:"fn,omitempty"`
-	Metric      string     `json:"metric,omitempty"`
-	EvaluatorID string     `json:"evaluator_id,omitempty"`
-	Selector    string     `json:"selector,omitempty"`
-	Tag         string     `json:"tag,omitempty"`
-	Comparator  string     `json:"comparator,omitempty"`
-	Value       *float64   `json:"value,omitempty"`
-}
-
-var (
-	gateFns         = set("mean", "pass_rate", "count", "sum", "min", "max", "stddev", "p50", "p90", "p95", "p99", "regression_vs_baseline")
-	gateMetrics     = set("evaluator", "results", "latency_ms", "ttft_ms", "cost_usd", "tokens")
-	gateSelectors   = set("all", "passed", "failed", "errored", "critical_fail", "major_fail", "minor_fail")
-	gateComparators = set(">=", ">", "<=", "<", "==", "!=")
-)
-
 func set(v ...string) map[string]bool {
 	m := make(map[string]bool, len(v))
 	for _, s := range v {
@@ -164,140 +146,7 @@ func set(v ...string) map[string]bool {
 	return m
 }
 
-func (n gateNode) validate(path string) error {
-	switch n.Op {
-	case "and", "or":
-		if len(n.Args) == 0 {
-			return invalid("%s: %s needs args", path, n.Op)
-		}
-	case "not":
-		if len(n.Args) != 1 {
-			return invalid("%s: not needs exactly one arg", path)
-		}
-	case "compare":
-		if !gateFns[n.Fn] {
-			return invalid("%s: unknown fn %q", path, n.Fn)
-		}
-		if n.Metric == "" {
-			n.Metric = "evaluator"
-		}
-		if !gateMetrics[n.Metric] {
-			return invalid("%s: unknown metric %q", path, n.Metric)
-		}
-		if n.Metric == "evaluator" && n.EvaluatorID == "" && n.Fn != "count" {
-			return invalid("%s: evaluator_id is required for metric evaluator", path)
-		}
-		if n.Selector != "" && !gateSelectors[n.Selector] {
-			return invalid("%s: unknown selector %q", path, n.Selector)
-		}
-		if !gateComparators[n.Comparator] || n.Value == nil {
-			return invalid("%s: comparator and value are required", path)
-		}
-		return nil
-	default:
-		return invalid("%s: unknown op %q", path, n.Op)
-	}
-	for i, a := range n.Args {
-		if err := a.validate(fmt.Sprintf("%s.args[%d]", path, i)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (n gateNode) text() string {
-	switch n.Op {
-	case "and", "or":
-		parts := make([]string, len(n.Args))
-		for i, a := range n.Args {
-			parts[i] = a.text()
-			if a.Op == "and" || a.Op == "or" {
-				parts[i] = "(" + parts[i] + ")"
-			}
-		}
-		return strings.Join(parts, " "+n.Op+" ")
-	case "not":
-		if len(n.Args) == 1 {
-			return "not (" + n.Args[0].text() + ")"
-		}
-	case "compare":
-		var arg string
-		switch {
-		case n.Metric == "evaluator" || n.Metric == "":
-			arg = n.EvaluatorID
-			if n.Selector != "" {
-				arg = n.Selector
-			}
-		case n.Metric == "results":
-			arg = n.Selector
-			if arg == "" {
-				arg = "all"
-			}
-		default:
-			arg = n.Metric
-		}
-		if n.Tag != "" {
-			arg += ", tag=" + n.Tag
-		}
-		v := ""
-		if n.Value != nil {
-			v = strconv.FormatFloat(*n.Value, 'g', -1, 64)
-		}
-		return fmt.Sprintf("%s(%s) %s %s", n.Fn, arg, n.Comparator, v)
-	}
-	return "?"
-}
-
-// GateText renders a gate expression AST as human-readable text.
-func GateText(raw json.RawMessage) string {
-	var n gateNode
-	if json.Unmarshal(raw, &n) != nil {
-		return ""
-	}
-	return n.text()
-}
-
-func parseGate(raw json.RawMessage) (json.RawMessage, error) {
-	var n gateNode
-	if err := json.Unmarshal(raw, &n); err != nil {
-		return nil, invalid("expr must be a gate expression object")
-	}
-	if err := n.validate("expr"); err != nil {
-		return nil, err
-	}
-	return raw, nil
-}
-
-func (s *Server) ListGates(ctx context.Context, req gen.ListGatesRequestObject) (gen.ListGatesResponseObject, error) {
-	if _, err := s.suite(ctx, req.Suite, store.RoleViewer); err != nil {
-		return nil, err
-	}
-	gs, err := s.Store.ListGates(ctx, req.Suite)
-	if err != nil {
-		return nil, err
-	}
-	return gen.ListGates200JSONResponse{Items: mapSlice(gs, toGate)}, nil
-}
-
-func (s *Server) CreateGate(ctx context.Context, req gen.CreateGateRequestObject) (gen.CreateGateResponseObject, error) {
-	x, err := s.suite(ctx, req.Suite, store.RoleEditor)
-	if err != nil {
-		return nil, err
-	}
-	if req.Body == nil {
-		return nil, invalid("expr is required")
-	}
-	expr, err := parseGate(req.Body.Expr)
-	if err != nil {
-		return nil, err
-	}
-	g := store.Gate{OrgID: x.OrgID, ProjectID: x.ProjectID, SuiteID: x.ID, Name: trimmed(req.Body.Name), Expr: expr,
-		Enabled: deref(req.Body.Enabled, true)}
-	if err := s.Store.CreateGate(ctx, &g); err != nil {
-		return nil, err
-	}
-	return gen.CreateGate201JSONResponse(toGate(g)), nil
-}
+// ---- gates (see handlers_gates.go) ----
 
 func (s *Server) suiteGate(ctx context.Context, suiteID, gateID uuid.UUID, min store.Role) (store.Gate, error) {
 	if _, err := s.suite(ctx, suiteID, min); err != nil {
@@ -308,30 +157,6 @@ func (s *Server) suiteGate(ctx context.Context, suiteID, gateID uuid.UUID, min s
 		err = store.ErrNotFound
 	}
 	return g, err
-}
-
-func (s *Server) UpdateGate(ctx context.Context, req gen.UpdateGateRequestObject) (gen.UpdateGateResponseObject, error) {
-	g, err := s.suiteGate(ctx, req.Suite, req.Gate, store.RoleEditor)
-	if err != nil {
-		return nil, err
-	}
-	if b := req.Body; b != nil {
-		if b.Name != nil {
-			g.Name = strings.TrimSpace(*b.Name)
-		}
-		if b.Expr != nil {
-			if g.Expr, err = parseGate(*b.Expr); err != nil {
-				return nil, err
-			}
-		}
-		if b.Enabled != nil {
-			g.Enabled = *b.Enabled
-		}
-	}
-	if err := s.Store.UpdateGate(ctx, &g); err != nil {
-		return nil, err
-	}
-	return gen.UpdateGate200JSONResponse(toGate(g)), nil
 }
 
 func (s *Server) DeleteGate(ctx context.Context, req gen.DeleteGateRequestObject) (gen.DeleteGateResponseObject, error) {
