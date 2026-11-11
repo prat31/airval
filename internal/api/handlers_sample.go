@@ -306,8 +306,8 @@ func (s *Server) populateSample(ctx context.Context, p store.Project) (gen.Sampl
 	specs := []evSpec{
 		{"Correct answer", "equals", "Output matches the expected answer exactly (whitespace and case normalized).", map[string]any{}, 1, "critical"},
 		{"Answer similarity", "levenshtein", "Edit similarity to the expected answer (partial credit for near misses).", map[string]any{}, 0.9, "major"},
-		{"Answer format", "regex", "Answers follow the house style: \"The answer is <code>.\"",
-			map[string]any{"pattern": `^The answer is [0-9a-f]{8}\.$`, "full_match": true}, 1, "minor"},
+		{"Answer format", "regex", "Answers are one complete sentence: capitalised, 20–280 characters, ending in a period.",
+			map[string]any{"pattern": `^[A-Z][^\n]{18,278}\.$`, "full_match": true}, 1, "minor"},
 		{"Latency budget", "latency_ms", "Responds within 75 ms.", map[string]any{"max_ms": 75}, 1, "minor"},
 	}
 	evs := make([]map[string]any, 0, len(specs))

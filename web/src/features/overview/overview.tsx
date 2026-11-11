@@ -42,20 +42,39 @@ export function OverviewScreen() {
 
   const o = overview.data
   const series = useMemo(() => {
-    // One line per suite; color follows the suite's position in the suite list (stable identity).
-    const order = (suites.data ?? []).map((s) => s.id)
-    const bySuite = new Map<string, { name: string; points: { t: string; v: number | null }[]; idx: number }>()
+    // One line per suite × target: mixing targets (e.g. prod and candidate) in one line would zig-zag
+    // between their pass rates. Colors follow suite order, then target order, so identity is stable.
+    const suiteOrder = (suites.data ?? []).map((s) => s.id)
+    const targetOrder = (targets.data ?? []).map((t) => t.id)
+    const byKey = new Map<string, { suite: string; target?: string; points: { t: string; v: number | null }[] }>()
     for (const s of trend.data?.series ?? []) {
-      const key = s.suite_id ?? s.key
-      const cur = bySuite.get(key) ?? { name: suiteById.get(key)?.name ?? s.label, points: [], idx: Math.max(0, order.indexOf(key)) }
+      const suite = s.suite_id ?? s.key
+      const key = `${suite}|${s.target_id ?? ''}`
+      const cur = byKey.get(key) ?? { suite, target: s.target_id, points: [] }
       cur.points.push(...s.points.map((p) => ({ t: p.t, v: p.value })))
-      bySuite.set(key, cur)
+      byKey.set(key, cur)
     }
-    return [...bySuite.values()]
-      .filter((s) => s.points.length > 0)
+    const lines = [...byKey.values()].filter((l) => l.points.length > 0)
+    const targetsPerSuite = new Map<string, number>()
+    for (const l of lines) targetsPerSuite.set(l.suite, (targetsPerSuite.get(l.suite) ?? 0) + 1)
+    const suiteRank = (l: (typeof lines)[number]) => suiteOrder.indexOf(l.suite)
+    const targetRank = (l: (typeof lines)[number]) => targetOrder.indexOf(l.target ?? '')
+    return lines
+      .sort((a, b) => suiteRank(a) - suiteRank(b) || targetRank(a) - targetRank(b))
       .slice(0, 6)
-      .map((s) => ({ name: s.name, colorIndex: s.idx % 6, points: s.points.sort((a, b) => Date.parse(a.t) - Date.parse(b.t)) }))
-  }, [trend.data, suiteById, suites.data])
+      .map((l, i) => {
+        const suiteName = suiteById.get(l.suite)?.name ?? 'Suite'
+        const multi = (targetsPerSuite.get(l.suite) ?? 0) > 1
+        const targetName = l.target ? targetById.get(l.target)?.name : undefined
+        // With a single suite on the chart its name adds nothing: label lines by target.
+        const name = !multi || !targetName ? suiteName : targetsPerSuite.size === 1 ? targetName : `${suiteName} · ${targetName}`
+        return {
+          name,
+          colorIndex: i,
+          points: l.points.sort((a, b) => Date.parse(a.t) - Date.parse(b.t)),
+        }
+      })
+  }, [trend.data, suiteById, targetById, suites.data, targets.data])
 
   const noRuns = recent.data?.length === 0
   const noSuites = suites.data?.length === 0
@@ -163,8 +182,8 @@ export function OverviewScreen() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <TrendLine
           className="lg:col-span-2"
-          title="Pass rate by suite"
-          description="Per finished run"
+          title="Pass rate over time"
+          description="Per finished run, one line per suite and target"
           series={series}
           format="percent"
           yDomain={[0, 1]}

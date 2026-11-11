@@ -75,7 +75,7 @@ test('onboarding: target test connection against /_mock, CSV import, presets, fi
   await page.getByRole('button', { name: /No endpoint handy/ }).click()
   await page.getByRole('button', { name: 'Run test' }).click()
   await expect(page.getByText('Connected')).toBeVisible()
-  await expect(page.getByText(/The answer is [0-9a-f]{8}\./).first()).toBeVisible()
+  await expect(page.getByText(/(business days|hours|minutes|seconds|months|release 2\.\d+|firmware 4\.\d)/).first()).toBeVisible()
   await page.getByRole('button', { name: 'Save target' }).click()
   await expect(page).toHaveURL(/step=2/)
 
@@ -108,7 +108,7 @@ test('sample project loads in one click with two finished runs', async () => {
   await expect(page).toHaveURL(/\/p\/sample-support-copilot\/overview/, { timeout: 60_000 })
   await expect(page.getByText('Latest pass rate')).toBeVisible()
   await expect(page.getByText('86.4%').first()).toBeVisible()
-  await expect(page.getByText('Pass rate by suite')).toBeVisible()
+  await expect(page.getByText('Pass rate over time')).toBeVisible()
 })
 
 test('a 1,000-example run finishes in under 15 s with live updates', async () => {
@@ -133,7 +133,7 @@ test('a 1,000-example run finishes in under 15 s with live updates', async () =>
 test('a failed result opens in the drawer', async () => {
   await page.getByRole('radio', { name: /^Failed \d+/ }).click()
   await expect(page).toHaveURL(/status=failed/)
-  const row = page.getByRole('row').filter({ hasText: 'The answer is' }).first()
+  const row = page.getByRole('row').filter({ has: page.getByRole('cell') }).nth(1)
   await row.click()
   const drawer = page.getByRole('dialog')
   await expect(drawer.getByText('Expected vs output', { exact: false })).toBeVisible()

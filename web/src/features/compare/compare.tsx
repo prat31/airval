@@ -70,7 +70,10 @@ function DeltaCell({ row, cell, baseValue }: { row: ScorecardRow; cell: Scorecar
   if (delta == null) return <span className="tabular text-sm text-text">{fmt(value, kind)}</span>
   const rel = kind === 'score' || kind === 'percent' ? Math.abs(delta) / 0.1 : baseValue ? Math.abs(delta / baseValue) / 0.3 : 0
   const better = lowerIsBetter(row.key) ? delta < 0 : delta > 0
-  const flat = Math.abs(delta) < (kind === 'percent' || kind === 'score' ? 0.0005 : 1e-9)
+  // Flat when the delta *displays* as zero (e.g. 0.3 ms on 67 ms is "0%"): no tint, no arrow, so the
+  // color never contradicts the number.
+  const shown = fmtDelta(delta, kind, baseValue)
+  const flat = Number(shown.replace(/[^0-9.]/g, '')) === 0
   const color = better ? 'var(--div-neg)' : 'var(--div-pos)'
   const strength = flat ? 0 : Math.round(8 + Math.min(1, rel) * 22)
   const ci = cell.ci_low != null && cell.ci_high != null ? `95% CI ${fmtDelta(cell.ci_low, kind, null)} … ${fmtDelta(cell.ci_high, kind, null)}` : null
@@ -93,7 +96,7 @@ function DeltaCell({ row, cell, baseValue }: { row: ScorecardRow; cell: Scorecar
         <span className="tabular text-sm text-text">{fmt(value, kind)}</span>
         <span className={cn('tabular inline-flex items-center gap-0.5 text-xs font-medium', flat ? 'text-text-muted' : 'text-text')}>
           {!flat && <span aria-hidden>{delta > 0 ? '▲' : '▼'}</span>}
-          {fmtDelta(delta, kind, baseValue)}
+          {flat ? `±${shown.replace(/^[+\-−±]/, '')}` : shown}
           {sig === false && !flat && <span className="text-text-muted" title="Not statistically significant">~</span>}
         </span>
       </span>

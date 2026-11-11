@@ -241,7 +241,7 @@ func (h *Harness) NewFixture(n int, minMean float64, suiteExtra Obj) Fixture {
 		cfg        Obj
 	}{
 		{"exact_match", "equals", Obj{}},
-		{"format", "regex", Obj{"pattern": `^The answer is [0-9a-f]{8}\.$`}},
+		{"format", "regex", Obj{"pattern": `^[A-Z][^\n]{18,278}\.$`}},
 		{"latency", "latency_ms", Obj{"max_ms": 10000}},
 	} {
 		var ev Obj

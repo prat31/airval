@@ -91,7 +91,8 @@ func hash64(s string) uint64 {
 // Truth is the ground-truth answer for a question; dataset generators can use
 // it to build `expected` values.
 func Truth(question string) string {
-	return fmt.Sprintf("The answer is %08x.", uint32(hash64(question)))
+	r := ruleFor(question)
+	return fmt.Sprintf(r.template, r.detail(hash64(question)))
 }
 
 // IsCorrect reports whether the mock answers question correctly at the given
@@ -131,7 +132,7 @@ func (s *server) answer(r *http.Request, question, expected string) string {
 		}
 		return Truth(question)
 	}
-	return fmt.Sprintf("The answer is %08x.", uint32(hash64("wrong:"+question)))
+	return wrongAnswer(question)
 }
 
 func tokens(s string) int { return len(strings.Fields(s)) }
