@@ -192,7 +192,7 @@ func (s *Store) upsertScores(ctx context.Context, scores []store.Score) error {
 const resultSelect = `SELECT res.id, res.run_id, res.example_id, res.example_revision_id, res.trial, res.status,
 	res.output, res.output_z, res.output_json, res.context, res.tool_calls, res.trace, res.transcript, res.request,
 	res.response, res.latency_ms, res.ttft_ms, res.tokens_in, res.tokens_out, res.cost_usd, res.error, res.cached,
-	res.created_at, r.tags
+	res.created_at, r.tags, r.input, r.expected
 	FROM results res LEFT JOIN example_revisions r ON r.id = res.example_revision_id`
 
 func scanResult(r scanner) (store.Result, error) {
@@ -203,7 +203,7 @@ func scanResult(r scanner) (store.Result, error) {
 	err := r.Scan(&x.ID, &x.RunID, &x.ExampleID, &x.ExampleRevisionID, &x.Trial, &x.Status, &x.Output, &z,
 		rawJSON{&x.OutputJSON}, rawJSON{&x.Context}, rawJSON{&x.ToolCalls}, rawJSON{&x.Trace}, rawJSON{&x.Transcript},
 		rawJSON{&x.Request}, rawJSON{&x.Response}, &x.LatencyMs, &x.TTFTMs, &x.TokensIn, &x.TokensOut, &x.CostUSD,
-		&x.Error, &x.Cached, &x.CreatedAt, jsonCol(&x.Tags))
+		&x.Error, &x.Cached, &x.CreatedAt, jsonCol(&x.Tags), rawJSON{&x.Input}, rawJSON{&x.Expected})
 	if err != nil {
 		return x, err
 	}
@@ -259,6 +259,23 @@ func (s *Store) GetResult(ctx context.Context, id uuid.UUID) (store.Result, erro
 	rs := []store.Result{x}
 	err = s.attachScores(ctx, rs)
 	return rs[0], err
+}
+
+func (s *Store) GetResults(ctx context.Context, ids []uuid.UUID) ([]store.Result, error) {
+	out := []store.Result{}
+	for _, c := range chunks(ids, chunkSize) {
+		b := &qb{}
+		b.where(inList(b, "res.id", c))
+		items, err := collect(ctx, s, resultSelect+b.whereSQL()+` ORDER BY res.id`, b.args, scanResult)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.attachScores(ctx, items); err != nil {
+			return nil, err
+		}
+		out = append(out, items...)
+	}
+	return out, nil
 }
 
 func (s *Store) ListResults(ctx context.Context, f store.ResultFilter, p store.ListParams) (store.Page[store.Result], error) {

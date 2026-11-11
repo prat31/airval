@@ -484,8 +484,15 @@ func testRuns(t *testing.T, s store.Store) {
 	f := setup(t, s)
 	su := store.Suite{OrgID: f.org.ID, ProjectID: f.proj.ID, Name: "S", Slug: "s"}
 	must(t, s.CreateSuite(ctx, &su))
-	r1 := newRun(t, s, f, func(r *store.Run) { r.SuiteID = &su.ID; r.Labels = map[string]string{"branch": "main", "git_sha": "abc"} })
-	r2 := newRun(t, s, f, func(r *store.Run) { r.SuiteID = &su.ID; r.TriggerKind = "api"; r.Labels = map[string]string{"branch": "dev"} })
+	r1 := newRun(t, s, f, func(r *store.Run) {
+		r.SuiteID = &su.ID
+		r.Labels = map[string]string{"branch": "main", "git_sha": "abc"}
+	})
+	r2 := newRun(t, s, f, func(r *store.Run) {
+		r.SuiteID = &su.ID
+		r.TriggerKind = "api"
+		r.Labels = map[string]string{"branch": "dev"}
+	})
 	_ = newRun(t, s, f, nil)
 	eq(t, "default status", r1.Status, store.RunQueued)
 
@@ -589,6 +596,13 @@ func testResults(t *testing.T, s store.Store) {
 	eq(t, "compressed output roundtrip", got.Output, rs[0].Output)
 	eq(t, "scores", len(got.Scores), 2)
 	eq(t, "tags", got.Tags[0], "even")
+	if !strings.Contains(string(got.Input), "question 0") {
+		t.Fatalf("input not joined: %s", got.Input)
+	}
+	many, err := s.GetResults(ctx, []uuid.UUID{rs[1].ID, rs[2].ID, uuid.New()})
+	must(t, err)
+	eq(t, "get results", len(many), 2)
+	eq(t, "get results scores", len(many[0].Scores), 2)
 
 	counts, err := s.CountResults(ctx, run.ID)
 	must(t, err)

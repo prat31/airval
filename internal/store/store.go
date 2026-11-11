@@ -318,6 +318,8 @@ type ResultStore interface {
 	// UpsertScores writes scores for existing results (re-score).
 	UpsertScores(ctx context.Context, scores []Score) error
 	GetResult(ctx context.Context, id uuid.UUID) (Result, error)
+	// GetResults loads several results (with Scores) by id, in id order; unknown ids are skipped.
+	GetResults(ctx context.Context, ids []uuid.UUID) ([]Result, error)
 	// ListResults returns results (with Scores and Tags) ordered by id ascending.
 	ListResults(ctx context.Context, f ResultFilter, p ListParams) (Page[Result], error)
 	// IterateRunResults streams every result of a run with Scores and Tags, in id order.

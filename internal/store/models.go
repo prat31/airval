@@ -367,9 +367,11 @@ type Result struct {
 	Cached            bool
 	CreatedAt         time.Time
 
-	// Populated on reads.
-	Scores []Score
-	Tags   []string // example revision tags (populated by IterateRunResults and ListResults)
+	// Populated on reads (from the example revision).
+	Scores   []Score
+	Tags     []string
+	Input    json.RawMessage
+	Expected json.RawMessage
 }
 
 type Score struct {
