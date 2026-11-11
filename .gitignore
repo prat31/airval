@@ -1,15 +1,60 @@
+# Build output
 /bin/
 /dist/
-/airval-data/
-node_modules/
 web/dist/*
 !web/dist/.gitkeep
+
+# Local runtime data (airval dev: SQLite, embedded NATS, generated master key)
+/airval-data/
 *.db
 *.db-*
-.env
-coverage.out
+*.sqlite
+*.sqlite-*
 
+# Dependencies
+node_modules/
+
+# Secrets & local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+airval.local.yaml
+
+# Tests, coverage, profiling, benchmarks
+coverage.out
+*.coverprofile
+*.test
+*.prof
+*.pprof
+/bench-results/
+web/coverage/
+web/test-results/
+web/playwright-report/
+web/blob-report/
+web/playwright/.cache/
+
+# Tooling caches
+web/.vite/
+web/*.tsbuildinfo
+*.tsbuildinfo
+.eslintcache
+
+# Helm dependency archives (fetched by `helm dependency build`)
+deploy/helm/*/charts/*.tgz
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
+
+# Agent worktrees and local agent settings
 .claude/worktrees/
-deploy/helm/airval/charts/*.tgz
+.claude/settings.local.json
 web/e2e-results/
 web/e2e-report/
+/airval
