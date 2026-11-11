@@ -11,6 +11,7 @@ import { FilterBar } from '@/components/ui/filter-bar'
 import { PageHeader } from '@/components/ui/page-header'
 import { selectionColumn, Table, type ColumnDef, type RowSelectionState } from '@/components/ui/table'
 import { Tooltip } from '@/components/ui/tooltip'
+import { cn } from '@/lib/cn'
 import { formatDateTime, formatRelative, formatUsd } from '@/lib/format'
 import { useHotkeys, useMediaQuery } from '@/lib/hotkeys'
 import { indexById, isActive, runsInfiniteQuery, suitesQuery, targetsQuery, type Run, type RunListQuery, type RunStatus, type TriggerKind } from './api'
@@ -41,6 +42,7 @@ export function RunsScreen() {
   const [runOpen, setRunOpen] = useState(false)
   const [selection, setSelection] = useState<RowSelectionState>({})
   const wide = useMediaQuery('(min-width: 1180px)')
+  const compact = useMediaQuery('(max-width: 1023px)')
 
   const setSearch = (patch: Partial<RunsSearch>) => navigate({ search: (s) => ({ ...s, ...patch }), replace: true })
 
@@ -103,11 +105,11 @@ export function RunsScreen() {
   const columns = useMemo<ColumnDef<Run, unknown>[]>(() => {
     const cols: (ColumnDef<Run, unknown> | false)[] = [
       selectionColumn<Run>(),
-      { id: 'status', header: 'Status', size: 116, enableSorting: false, cell: ({ row }) => <RunStatusPill run={row.original} size="sm" /> },
+      { id: 'status', header: 'Status', size: 112, enableSorting: false, cell: ({ row }) => <RunStatusPill run={row.original} size="sm" /> },
       {
         id: 'run',
         header: 'Run',
-        size: 240,
+        size: wide ? 240 : 164,
         meta: { grow: true },
         accessorFn: (r) => runTitle(r, suiteById.get(r.suite_id ?? '')?.name),
         cell: ({ row }) => {
@@ -120,6 +122,8 @@ export function RunsScreen() {
                 {r.name && suiteName ? `${suiteName} · ` : ''}
                 <span className="font-mono">{shortId(r.id)}</span>
                 {!wide && <> · {targetById.get(r.target_id ?? '')?.name ?? '—'}</>}
+                {!wide && r.labels.git_sha && <> · <span className="font-mono">{r.labels.git_sha.slice(0, 7)}</span></>}
+                {compact && <> · {formatRelative(new Date(r.created_at))}</>}
               </span>
             </div>
           )
@@ -132,28 +136,28 @@ export function RunsScreen() {
         accessorFn: (r) => targetById.get(r.target_id ?? '')?.name ?? '',
         cell: ({ getValue }) => <span className="truncate text-text-2">{(getValue() as string) || '—'}</span>,
       },
-      { id: 'trigger', header: 'Trigger', size: 72, enableSorting: false, meta: { align: 'center' }, cell: ({ row }) => <TriggerIcon kind={row.original.trigger_kind} /> },
+      { id: 'trigger', header: 'Trigger', size: 64, enableSorting: false, meta: { align: 'center' }, cell: ({ row }) => <TriggerIcon kind={row.original.trigger_kind} /> },
       {
         id: 'pass',
         header: 'Pass rate',
-        size: 160,
+        size: wide ? 160 : 140,
         accessorFn: (r) => r.summary?.pass_rate ?? -1,
         cell: ({ row }) => {
           const r = row.original
           if (isActive(r.status))
             return (
-              <span className="flex w-full items-center gap-2">
+              <span className={cn('flex items-center gap-2', wide ? 'w-[136px]' : 'w-[116px]')}>
                 <span className="tabular w-11 shrink-0 text-right text-xs text-text-2">{r.total ? Math.floor((r.completed / r.total) * 100) : 0}%</span>
                 <ProgressBar run={r} className="flex-1" />
               </span>
             )
-          return <PassRateBar value={r.summary?.pass_rate} />
+          return <PassRateBar value={r.summary?.pass_rate} className={wide ? 'w-[136px]' : 'w-[116px]'} />
         },
       },
-      {
+      !compact && {
         id: 'score',
         header: 'Avg score',
-        size: 92,
+        size: 84,
         meta: { align: 'right', numeric: true },
         accessorFn: (r) => r.summary?.mean_score ?? -1,
         cell: ({ row }) => (row.original.summary?.mean_score != null ? row.original.summary.mean_score.toFixed(2) : <span className="text-text-muted">—</span>),
@@ -174,11 +178,11 @@ export function RunsScreen() {
         accessorFn: (r) => r.cost_usd,
         cell: ({ row }) => <span className="text-text-2">{row.original.cost_usd ? formatUsd(row.original.cost_usd) : '—'}</span>,
       },
-      { id: 'labels', header: 'Labels', size: 180, enableSorting: false, cell: ({ row }) => <LabelBadges labels={row.original.labels} max={wide ? 2 : 1} /> },
-      {
+      wide && { id: 'labels', header: 'Labels', size: 180, enableSorting: false, cell: ({ row }) => <LabelBadges labels={row.original.labels} max={2} /> },
+      !compact && {
         id: 'created',
         header: 'Started',
-        size: 112,
+        size: wide ? 112 : 96,
         meta: { align: 'right' },
         accessorFn: (r) => r.created_at,
         cell: ({ row }) => (
@@ -189,7 +193,7 @@ export function RunsScreen() {
       },
     ]
     return cols.filter(Boolean) as ColumnDef<Run, unknown>[]
-  }, [suiteById, targetById, wide])
+  }, [suiteById, targetById, wide, compact])
 
   const onScroll = (e: UIEvent<HTMLDivElement>) => {
     const el = e.target as HTMLElement

@@ -148,7 +148,7 @@ export function OverviewScreen() {
             value={o ? formatUsd(o.spend_7d_usd) : '—'}
             delta={
               spendDelta != null && o?.spend_prev_7d_usd
-                ? { value: formatDelta(spendDelta / o.spend_prev_7d_usd, 'percent').replace('pts', '%'), direction: Math.abs(spendDelta) < 0.005 ? 'flat' : spendDelta > 0 ? 'up' : 'down', upIsGood: false, context: 'vs prior 7 days' }
+                ? { value: `${spendDelta >= 0 ? '+' : '−'}${Math.round(Math.abs(spendDelta / o.spend_prev_7d_usd) * 100)}%`, direction: Math.abs(spendDelta) < 0.005 ? 'flat' : spendDelta > 0 ? 'up' : 'down', upIsGood: false, context: 'vs prior 7 days' }
                 : undefined
             }
           />
@@ -281,7 +281,7 @@ export function OverviewScreen() {
                   onClick={() => navigate({ to: '/o/$org/p/$project/runs/$run', params: { ...params, run: r.id } })}
                   className="grid w-full grid-cols-[96px_minmax(0,1fr)_120px] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-hover focus-ring sm:grid-cols-[104px_minmax(0,1fr)_28px_160px_96px]"
                 >
-                  <RunStatusPill run={r} size="sm" />
+                  <span className="justify-self-start"><RunStatusPill run={r} size="sm" /></span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium text-text">{runTitle(r, suiteById.get(r.suite_id ?? '')?.name)}</span>
                     <span className="block truncate text-xs text-text-muted">{targetById.get(r.target_id ?? '')?.name ?? '—'}</span>

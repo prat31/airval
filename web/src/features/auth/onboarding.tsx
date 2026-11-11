@@ -57,7 +57,7 @@ export function OnboardingScreen() {
   const org = me.data?.orgs.find((o) => o.slug === orgSlug) ?? me.data?.orgs[0]
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <div className="text-center">
         <h1 className="text-xl font-semibold tracking-tight text-text">Let’s evaluate your AI service</h1>
         <p className="mt-1 text-sm text-text-2">

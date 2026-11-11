@@ -87,8 +87,8 @@ export function RunCharts({ run, aggregates, baseline, evaluators, loading, hist
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <Histogram
-        title="Score distribution"
-        description={ev?.threshold != null ? `Dashed rule: pass threshold ${ev.threshold.toFixed(2)}` : 'Per result'}
+        title="Scores"
+        description={ev?.threshold != null ? `Distribution · threshold ${ev.threshold.toFixed(2)}` : 'Distribution per result'}
         series={histSeries}
         threshold={ev?.threshold}
         loading={loading && !aggregates}
@@ -98,7 +98,7 @@ export function RunCharts({ run, aggregates, baseline, evaluators, loading, hist
             <Select
               size="sm"
               aria-label="Evaluator"
-              className="w-40"
+              className="w-36"
               value={evId}
               onValueChange={onHistEvaluator}
               options={evaluators.map((e) => ({ value: e.id, label: e.name }))}
@@ -129,18 +129,7 @@ export function RunCharts({ run, aggregates, baseline, evaluators, loading, hist
         empty={!passByTag.length ? empty : undefined}
         ariaLabel="Pass rate by example tag"
       />
-      <Heatmap
-        title="Evaluator × tag"
-        description="Mean score; darker is higher"
-        rows={evaluators.map((e) => e.name)}
-        columns={tags}
-        values={heat}
-        loading={loading && !aggregates}
-        empty={!tags.length || !evaluators.length ? empty : undefined}
-        ariaLabel="Mean score per evaluator and tag"
-      />
       <HorizontalBars
-        className="lg:col-span-2"
         title="Cost breakdown"
         description={`${formatUsd(run.cost_usd)} total · ${formatCompact(run.tokens_in)} tokens in · ${formatCompact(run.tokens_out)} tokens out`}
         items={costs}
@@ -151,6 +140,17 @@ export function RunCharts({ run, aggregates, baseline, evaluators, loading, hist
         loading={loading && !aggregates}
         empty={!costs.length ? empty : undefined}
         ariaLabel="Cost by source: target and LLM judges"
+      />
+      <Heatmap
+        className="lg:col-span-2"
+        title="Evaluator × tag"
+        description="Mean score; darker is higher"
+        rows={evaluators.map((e) => e.name)}
+        columns={tags}
+        values={heat}
+        loading={loading && !aggregates}
+        empty={!tags.length || !evaluators.length ? empty : undefined}
+        ariaLabel="Mean score per evaluator and tag"
       />
     </div>
   )

@@ -42,13 +42,16 @@ export const runKeys = {
   aggregates: (id: string) => ['runs', 'aggregates', id] as const,
 }
 
+/** The spec declares array query params as `style: form, explode: false` (comma-separated). */
+export const csvArrays = { array: { style: 'form', explode: false } } as const
+
 const RUN_PAGE = 200
 const RESULT_PAGE = 500
 
 export const runsInfiniteQuery = (q: RunListQuery) =>
   infiniteQueryOptions({
     queryKey: runKeys.list(q),
-    queryFn: ({ pageParam }) => unwrap(api.GET('/v1/runs', { params: { query: { ...q, cursor: pageParam, limit: q.limit ?? RUN_PAGE } } })),
+    queryFn: ({ pageParam }) => unwrap(api.GET('/v1/runs', { params: { query: { ...q, cursor: pageParam, limit: q.limit ?? RUN_PAGE } }, querySerializer: csvArrays })),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     placeholderData: keepPreviousData,
@@ -59,7 +62,7 @@ export const runsInfiniteQuery = (q: RunListQuery) =>
 export const runsQuery = (q: RunListQuery) =>
   queryOptions({
     queryKey: [...runKeys.list(q), 'page'] as const,
-    queryFn: async () => (await unwrap(api.GET('/v1/runs', { params: { query: q } }))).items,
+    queryFn: async () => (await unwrap(api.GET('/v1/runs', { params: { query: q }, querySerializer: csvArrays }))).items,
     enabled: !!q.project_id,
   })
 
@@ -67,7 +70,7 @@ export const liveRunsQuery = (projectId: string) =>
   queryOptions({
     queryKey: runKeys.live(projectId),
     queryFn: async () =>
-      (await unwrap(api.GET('/v1/runs', { params: { query: { project_id: projectId, status: ACTIVE_STATUSES, limit: 50 } } }))).items,
+      (await unwrap(api.GET('/v1/runs', { params: { query: { project_id: projectId, status: ACTIVE_STATUSES, limit: 50 } }, querySerializer: csvArrays }))).items,
     enabled: !!projectId,
     refetchInterval: (q) => ((q.state.data?.length ?? 0) > 0 ? 5_000 : 20_000),
     refetchIntervalInBackground: false,
@@ -91,7 +94,7 @@ export const resultsInfiniteQuery = (runId: string, q: ResultListQuery) =>
   infiniteQueryOptions({
     queryKey: runKeys.resultList(runId, q),
     queryFn: ({ pageParam }) =>
-      unwrap(api.GET('/v1/runs/{run}/results', { params: { path: { run: runId }, query: { ...q, cursor: pageParam, limit: RESULT_PAGE } } })),
+      unwrap(api.GET('/v1/runs/{run}/results', { params: { path: { run: runId }, query: { ...q, cursor: pageParam, limit: RESULT_PAGE } }, querySerializer: csvArrays })),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     placeholderData: keepPreviousData,

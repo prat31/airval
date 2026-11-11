@@ -88,8 +88,8 @@ interface EvalDef {
   judge?: boolean
 }
 const evalDefs: EvalDef[] = [
-  { name: 'correctness', kind: 'correctness', category: 'model', mean: 0.82, sd: 0.14, threshold: 0.7, severity: 'critical', judge: true },
-  { name: 'faithfulness', kind: 'faithfulness', category: 'model', mean: 0.87, sd: 0.11, threshold: 0.75, severity: 'major', judge: true },
+  { name: 'correctness', kind: 'correctness', category: 'model', mean: 0.82, sd: 0.13, threshold: 0.6, severity: 'critical', judge: true },
+  { name: 'faithfulness', kind: 'faithfulness', category: 'model', mean: 0.87, sd: 0.1, threshold: 0.65, severity: 'major', judge: true },
   { name: 'answer_relevance', kind: 'answer_relevance', category: 'model', mean: 0.85, sd: 0.1, threshold: 0.7, severity: 'minor', judge: true },
   { name: 'conciseness', kind: 'conciseness', category: 'model', mean: 0.74, sd: 0.15, threshold: 0.6, severity: 'minor', judge: true },
   { name: 'no_pii', kind: 'no_pii', category: 'deterministic', mean: 0.985, sd: 0, threshold: 1, severity: 'critical' },
@@ -158,15 +158,15 @@ const suiteSize = [1200, 400, 60]
 const gateTexts: Record<string, { text: string; ev?: number; fn: 'mean' | 'pass_rate' | 'count' | 'p95'; cmp: number }[]> = {
   [suites[0]!.id]: [
     { text: 'mean(correctness) >= 0.80', ev: 0, fn: 'mean', cmp: 0.8 },
-    { text: 'pass_rate(all) >= 0.85', fn: 'pass_rate', cmp: 0.85 },
-    { text: 'count(critical_fail) <= 15', fn: 'count', cmp: 15 },
+    { text: 'pass_rate(all) >= 0.80', fn: 'pass_rate', cmp: 0.8 },
+    { text: 'count(critical_fail) <= 120', fn: 'count', cmp: 120 },
     { text: 'p95(latency_ms) < 2500', fn: 'p95', cmp: 2500 },
   ],
   [suites[1]!.id]: [
     { text: 'mean(faithfulness) >= 0.85', ev: 1, fn: 'mean', cmp: 0.85 },
     { text: 'pass_rate(all) >= 0.80', fn: 'pass_rate', cmp: 0.8 },
   ],
-  [suites[2]!.id]: [{ text: 'pass_rate(all) >= 0.90', fn: 'pass_rate', cmp: 0.9 }],
+  [suites[2]!.id]: [{ text: 'pass_rate(all) >= 0.85', fn: 'pass_rate', cmp: 0.85 }],
 }
 
 // ------------------------------------------------------------------ content
@@ -623,7 +623,7 @@ export function hydrate(run: Run): Run {
       passed = value >= g.cmp
     } else if (g.fn === 'count') {
       value = criticalFails
-      passed = value <= Math.max(g.cmp, Math.round(ls.length * 0.0125))
+      passed = value <= g.cmp * Math.max(1, ls.length / 1200)
     } else {
       value = lat?.p95 ?? 0
       passed = value < g.cmp

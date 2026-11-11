@@ -21,7 +21,7 @@ import { api, ApiError, unwrap } from '@/lib/api/client'
 import type { components } from '@/lib/api/schema'
 import { cn } from '@/lib/cn'
 import { formatDuration, formatPercent, formatRelative, formatUsd } from '@/lib/format'
-import { indexById, runsQuery, suitesQuery, type Result, type Run } from '@/features/runs/api'
+import { csvArrays, indexById, runsQuery, suitesQuery, type Result, type Run } from '@/features/runs/api'
 import { preview } from '@/features/runs/results-table'
 import { PassRateBar, RunLetter, RunStatusPill, runTitle, RUN_LETTERS, shortId } from '@/features/runs/ui'
 import type { CompareSearch } from './search'
@@ -35,7 +35,7 @@ const LIMIT = 25
 
 const comparisonQuery = (runs: string[], ev?: string, against?: string) => ({
   queryKey: ['comparisons', runs.join(','), ev ?? '', against ?? ''] as const,
-  queryFn: () => unwrap(api.GET('/v1/comparisons', { params: { query: { runs, evaluator_id: ev, against, limit: LIMIT } } })),
+  queryFn: () => unwrap(api.GET('/v1/comparisons', { params: { query: { runs, evaluator_id: ev, against, limit: LIMIT } }, querySerializer: csvArrays })),
   enabled: runs.length >= 2,
   placeholderData: keepPreviousData,
   retry: false,

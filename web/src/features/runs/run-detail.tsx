@@ -118,9 +118,9 @@ function GateVerdict({ run }: { run: Run }) {
         </div>
         {!active && <span className="text-xs text-text-muted">{allPass ? 'CI exit code 0' : 'CI exit code 1'}</span>}
       </div>
-      <ul className="grid grid-cols-1 divide-y divide-border md:grid-cols-2 md:divide-y-0">
+      <ul className="grid grid-cols-1 divide-y divide-border xl:grid-cols-2 xl:divide-y-0">
         {gates.map((g, i) => (
-          <li key={g.gate_id || i} className={cn('flex items-center gap-2.5 px-4 py-2', i >= 2 && 'md:border-t md:border-border')}>
+          <li key={g.gate_id || i} className={cn('flex items-center gap-2.5 px-4 py-2', i >= 2 && 'xl:border-t xl:border-border')}>
             {g.passed ? <CircleCheck className="size-4 shrink-0 text-pass" aria-label="passed" /> : <CircleX className="size-4 shrink-0 text-fail" aria-label="failed" />}
             <code className="min-w-0 flex-1 truncate font-mono text-xs text-text">{g.text || g.name}</code>
             {g.value != null && <span className={cn('tabular shrink-0 font-mono text-xs', g.passed ? 'text-text-2' : 'text-fail')}>{Math.abs(g.value) >= 10 ? Math.round(g.value) : g.value.toFixed(3)}</span>}
@@ -184,7 +184,7 @@ function Scorecards({
 }) {
   if (loading)
     return (
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
         {Array.from({ length: Math.max(3, evaluators.length || 4) }, (_, i) => (
           <StatTile key={i} label="Evaluator" value="—" loading />
         ))}
@@ -193,7 +193,7 @@ function Scorecards({
   if (!evaluators.length) return null
   const find = (aggs: RunAggregate[] | undefined, id: string) => aggs?.find((a) => a.metric === 'score' && a.evaluator_id === id && a.slice_key === '')
   return (
-    <div className={cn('grid grid-cols-2 gap-3 md:grid-cols-3', evaluators.length >= 5 ? 'xl:grid-cols-6' : 'xl:grid-cols-4')}>
+    <div className={cn('grid grid-cols-2 gap-3 lg:grid-cols-3', evaluators.length >= 5 ? '2xl:grid-cols-6' : 'xl:grid-cols-4')}>
       {evaluators.map((e) => {
         const cur = find(aggregates, e.id)
         const base = find(baseline, e.id)
@@ -201,9 +201,8 @@ function Scorecards({
         return (
           <StatTile
             key={e.id}
-            label={e.name}
+            label={cur?.pass_rate != null ? `${e.name} · ${formatPercent(cur.pass_rate, 0)} pass` : e.name}
             value={cur?.mean != null ? cur.mean.toFixed(2) : '—'}
-            unit={cur?.pass_rate != null ? `${formatPercent(cur.pass_rate, 0)} pass` : undefined}
             delta={
               d != null
                 ? { value: formatDelta(d, 'score'), direction: Math.abs(d) < 0.005 ? 'flat' : d > 0 ? 'up' : 'down', context: 'vs baseline' }
@@ -338,7 +337,7 @@ export function RunDetailScreen() {
           <Skeleton className="h-4 w-96" />
         </div>
         <Skeleton className="h-16 w-full" />
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
           {Array.from({ length: 6 }, (_, i) => (
             <StatTile key={i} label="Evaluator" value="—" loading />
           ))}
@@ -486,19 +485,19 @@ export function RunDetailScreen() {
             <ProgressBar run={run} />
           </div>
         )}
-        <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-3 2xl:grid-cols-6">
           <Metric icon={<Gauge />} label="Pass rate" value={run.summary?.pass_rate != null ? formatPercent(run.summary.pass_rate) : '—'} />
           <Metric icon={<Timer />} label="Duration" value={formatRunDuration(run)} />
           <Metric icon={<Zap />} label="Throughput" value={thr ? `${formatCompact(thr)}/min` : '—'} hint="Results per minute" />
           <Metric
             icon={<Timer />}
-            label="Latency p50 / p95"
-            value={run.summary?.latency_p50_ms != null ? `${formatDuration(run.summary.latency_p50_ms)} / ${formatDuration(run.summary.latency_p95_ms ?? 0)}` : '—'}
+            label="Latency p50·p95"
+            value={run.summary?.latency_p50_ms != null ? `${formatDuration(run.summary.latency_p50_ms)} · ${formatDuration(run.summary.latency_p95_ms ?? 0)}` : '—'}
           />
           <Metric icon={<Coins />} label="Cost" value={formatUsd(run.cost_usd)} hint={`${run.tokens_in.toLocaleString()} tokens in, ${run.tokens_out.toLocaleString()} out`} />
           <Metric
             icon={<Sparkles />}
-            label="Tokens · cache hits"
+            label="Tokens · cached"
             value={`${formatCompact(run.tokens_in + run.tokens_out)}${run.summary?.cache_hit_ratio != null ? ` · ${formatPercent(run.summary.cache_hit_ratio, 0)}` : ''}`}
           />
         </div>

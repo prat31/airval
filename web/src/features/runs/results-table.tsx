@@ -77,7 +77,7 @@ export function ResultsTable({ run, search, setSearch, evaluators, tags, results
   }, [q, search.q, setSearch])
 
   const rows = useMemo(() => results.data?.pages.flatMap((p) => p.items) ?? [], [results.data])
-  const shownEvals = wide ? evaluators : evaluators.slice(0, 3)
+  const shownEvals = wide ? evaluators : evaluators.slice(0, 2)
 
   const columns = useMemo<ColumnDef<Result, unknown>[]>(
     () => [
@@ -85,7 +85,7 @@ export function ResultsTable({ run, search, setSearch, evaluators, tags, results
       {
         id: 'input',
         header: 'Input',
-        size: 220,
+        size: 180,
         meta: { grow: true },
         enableSorting: false,
         cell: ({ row }) => <span className="text-text">{preview(row.original.input)}</span>,
@@ -93,7 +93,7 @@ export function ResultsTable({ run, search, setSearch, evaluators, tags, results
       {
         id: 'output',
         header: 'Output',
-        size: 220,
+        size: 180,
         meta: { grow: true },
         enableSorting: false,
         cell: ({ row }) =>
@@ -110,7 +110,7 @@ export function ResultsTable({ run, search, setSearch, evaluators, tags, results
             {e.name}
           </span>
         ),
-        size: 96,
+        size: 108,
         enableSorting: false,
         cell: ({ row }) => {
           const s = row.original.scores.find((x) => x.evaluator_id === e.id)
