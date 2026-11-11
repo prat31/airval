@@ -59,6 +59,15 @@
             "maxOpenConns": {"type": "integer", "minimum": 0}
           }
         },
+        "dev": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "image": {"type": "string"},
+            "persistence": {"type": "object"},
+            "resources": {"type": "object"}
+          }
+        },
         "cnpg": {
           "type": "object",
           "properties": {

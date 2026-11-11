@@ -34,6 +34,8 @@ spec:
     spec:
       serviceAccountName: {{ include "airval.serviceAccountName" . }}
       automountServiceAccountToken: false
+      # Service-link env vars (AIRVAL_NATS_PORT=tcp://...) collide with the AIRVAL_* config namespace.
+      enableServiceLinks: false
       {{- with .Values.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -48,11 +50,27 @@ spec:
           args: ["worker"]
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: metrics
+              containerPort: 8081
           env:
             {{- include "airval.env" (dict "ctx" . "role" "worker") | nindent 12 }}
             {{- with .Values.worker.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          # The worker serves /healthz, /readyz (DB + NATS) and /metrics on worker.listen (:8081).
+          startupProbe:
+            httpGet: {path: /healthz, port: metrics}
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: {path: /healthz, port: metrics}
+            periodSeconds: 15
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet: {path: /readyz, port: metrics}
+            periodSeconds: 10
+            timeoutSeconds: 3
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
           volumeMounts:

@@ -1,0 +1,100 @@
+{{- if .Values.postgresql.dev.enabled }}
+# Dev-only Postgres (postgresql.dev.enabled): single pod, no backups, no HA. Use an external/managed Postgres in production.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "airval.devPgName" . }}
+  labels:
+    {{- include "airval.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  clusterIP: None
+  ports:
+    - {name: postgres, port: 5432, targetPort: postgres}
+  selector:
+    {{- include "airval.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "airval.devPgName" . }}
+  labels:
+    {{- include "airval.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  serviceName: {{ include "airval.devPgName" . }}
+  selector:
+    matchLabels:
+      {{- include "airval.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        {{- include "airval.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: database
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # The postgres image runs as uid/gid 70 (not the 65532 the airval image uses).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: postgres
+          image: {{ .Values.postgresql.dev.image | quote }}
+          ports:
+            - {name: postgres, containerPort: 5432}
+          env:
+            - {name: POSTGRES_USER, value: airval}
+            - {name: POSTGRES_DB, value: airval}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "airval.secretName" . }}
+                  key: postgres-password
+          readinessProbe:
+            exec: {command: [pg_isready, -U, airval, -d, airval]}
+            periodSeconds: 5
+          livenessProbe:
+            exec: {command: [pg_isready, -U, airval, -d, airval]}
+            periodSeconds: 20
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.postgresql.dev.resources | nindent 12 }}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: run, mountPath: /var/run/postgresql}
+      volumes:
+        - name: run
+          emptyDir: {}
+        {{- if not .Values.postgresql.dev.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.postgresql.dev.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.postgresql.dev.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.dev.persistence.size }}
+  {{- end }}
+{{- end }}

@@ -96,6 +96,12 @@ services:
       nats: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
     stop_grace_period: 45s # finish in-flight work, nak the rest
+    healthcheck: # the worker serves /healthz, /readyz (DB + NATS) and /metrics on worker.listen (:8081)
+      test: ["CMD", "/usr/local/bin/airval-probe", "http://127.0.0.1:8081/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
 
   # Fake AI service to evaluate against (target URL: http://mocktarget:9090).
   mocktarget:

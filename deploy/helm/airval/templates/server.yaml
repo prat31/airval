@@ -33,6 +33,8 @@ spec:
     spec:
       serviceAccountName: {{ include "airval.serviceAccountName" . }}
       automountServiceAccountToken: false
+      # Service-link env vars (AIRVAL_NATS_PORT=tcp://...) collide with the AIRVAL_* config namespace.
+      enableServiceLinks: false
       {{- with .Values.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

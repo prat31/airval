@@ -2,7 +2,7 @@
 config:
   baseUrl: https://airval.example.com
   cookieSecure: true
-  otlpEndpoint: otel-collector.observability:4317
+  otlpEndpoint: otel-collector.observability:4318
   env:
     AIRVAL_SECURITY_DENY_CIDRS: "10.0.0.0/8"
 secrets:

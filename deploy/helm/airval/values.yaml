@@ -21,7 +21,7 @@ config:
   # Set true when serving over HTTPS (Ingress TLS / Gateway listener).
   cookieSecure: false
   allowSignup: false
-  # OTLP/gRPC endpoint for traces, e.g. "otel-collector.observability:4317". Empty disables export.
+  # OTLP/HTTP endpoint for traces (host:port or full URL), e.g. "otel-collector.observability:4318". Empty disables export.
   otlpEndpoint: ""
   traceSampleRatio: 0.1
   # Extra AIRVAL_* settings as a map, e.g. { AIRVAL_SECURITY_DENY_CIDRS: "10.0.0.0/8" }.
@@ -75,6 +75,19 @@ postgresql:
       size: 10Gi
       storageClass: ""
     resources: {}
+
+  # Plain single-pod Postgres for trying airval out (kind, minikube, CI). NOT for production: no backups, no HA.
+  # Data lives in an emptyDir unless persistence.enabled. The password is generated into the chart Secret.
+  dev:
+    enabled: false
+    image: postgres:17-alpine
+    persistence:
+      enabled: false
+      size: 5Gi
+      storageClass: ""
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {memory: 512Mi}
 
 # ---------------------------------------------------------------------------------------------
 # NATS JetStream: official subchart (3 replicas) or an external cluster.
