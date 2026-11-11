@@ -45,6 +45,27 @@ test('setup creates the owner and organization', async () => {
   await expect(page.getByRole('heading', { name: 'Let’s evaluate your AI service' })).toBeVisible()
 })
 
+test('setup is skippable: lands on the org home with zero projects, nothing auto-created', async () => {
+  await page.getByRole('button', { name: 'Skip setup' }).click()
+  await expect(page).toHaveURL(/\/o\/[^/]+$/)
+  await expect(page.getByRole('heading', { name: 'No projects yet' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Select a project' })).toContainText('No projects yet')
+  // Org-level settings work without a project.
+  await page.getByRole('link', { name: 'Settings' }).click()
+  await expect(page).toHaveURL(/\/o\/[^/]+\/settings\/general$/)
+  // Coming back to "/" stays on the org home instead of forcing setup again.
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'No projects yet' })).toBeVisible()
+  const projects = await page.evaluate(async () => {
+    const me = await (await fetch('/v1/auth/me')).json()
+    const res = await fetch(`/v1/projects?org_id=${me.orgs[0].id}`)
+    return (await res.json()).items.length
+  })
+  expect(projects).toBe(0)
+  await page.getByRole('link', { name: 'Guided setup' }).click()
+  await expect(page.getByRole('heading', { name: 'Let’s evaluate your AI service' })).toBeVisible()
+})
+
 test('onboarding: target test connection against /_mock, CSV import, presets, first run', async () => {
   await page.getByLabel('Name', { exact: true }).fill('E2E Bot')
   await page.getByRole('button', { name: 'Create project' }).click()

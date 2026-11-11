@@ -6,6 +6,7 @@ import {
   ChevronsUpDown,
   CircleHelp,
   Database,
+  FolderOpen,
   Keyboard,
   Layers,
   LogOut,
@@ -150,20 +151,21 @@ function ProjectSwitcher() {
   const { collapsed } = useSidebar()
   const navigate = useNavigate()
   const [newProject, setNewProject] = useState(false)
-  if (!project) return null
   const trigger = (
     <button
       type="button"
-      aria-label={`Project: ${project.name}`}
+      aria-label={project ? `Project: ${project.name}` : 'Select a project'}
       className={cn(
         'flex h-8 items-center gap-2 rounded-md border border-border bg-surface text-left transition-colors hover:border-border-strong focus-ring',
         collapsed ? 'size-9 justify-center' : 'w-full px-2',
       )}
     >
-      <ProjectDot project={project} />
+      {project ? <ProjectDot project={project} /> : <FolderOpen className="size-3.5 shrink-0 text-text-muted" />}
       {!collapsed && (
         <>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{project.name}</span>
+          <span className={cn('min-w-0 flex-1 truncate text-sm', project ? 'font-medium text-text' : 'text-text-muted')}>
+            {project ? project.name : projects.length ? 'Select a project' : 'No projects yet'}
+          </span>
           <ChevronsUpDown className="size-3.5 shrink-0 text-text-muted" />
         </>
       )}
@@ -176,6 +178,7 @@ function ProjectSwitcher() {
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent className="w-60" side={collapsed ? 'right' : 'bottom'}>
         <DropdownMenuLabel>Projects in {org.name}</DropdownMenuLabel>
+        {projects.length === 0 && <div className="px-2 pb-1.5 text-xs text-text-muted">None yet.</div>}
         {projects.map((p) => (
           <DropdownMenuItem
             key={p.slug}
@@ -184,7 +187,7 @@ function ProjectSwitcher() {
           >
             <span className="flex items-center justify-between gap-2">
               {p.name}
-              {p.slug === project.slug && <Check className="size-3.5! text-accent!" />}
+              {p.slug === project?.slug && <Check className="size-3.5! text-accent!" />}
             </span>
           </DropdownMenuItem>
         ))}
@@ -224,7 +227,11 @@ function UserMenu({ onShortcuts }: { onShortcuts: () => void }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           icon={<UserIcon />}
-          onSelect={() => project && navigate({ to: '/o/$org/p/$project/settings/$section', params: { org: org.slug, project: project.slug, section: 'general' } })}
+          onSelect={() =>
+            project
+              ? navigate({ to: '/o/$org/p/$project/settings/$section', params: { org: org.slug, project: project.slug, section: 'general' } })
+              : navigate({ to: '/o/$org/settings/$section', params: { org: org.slug, section: 'general' } })
+          }
         >
           Account settings
         </DropdownMenuItem>
@@ -355,20 +362,25 @@ export function AppShell() {
 
   const params = { org: org.slug, project: project?.slug ?? '' }
   const go = (to: string) => navigate({ to, params })
+  // Without a project (an org with none yet), project sections have nowhere to go: show the org home
+  // and org-level settings instead of dead links.
+  const nav = project ? projectNav : []
+  const settingsTo = project ? settingsNav.to : '/o/$org/settings'
 
   const hotkeys: Record<string, () => void> = {
     'mod+k': () => setPaletteOpen((o) => !o),
     '?': () => setShortcutsOpen(true),
     '[': toggleSidebar,
   }
-  for (const n of [...projectNav, settingsNav]) hotkeys[`g ${n.key}`] = () => go(n.to)
+  for (const n of nav) hotkeys[`g ${n.key}`] = () => go(n.to)
+  hotkeys[`g ${settingsNav.key}`] = () => go(settingsTo)
   useHotkeys(hotkeys)
 
   const groups: CommandGroup[] = useMemo(
     () => [
       {
         heading: 'Go to',
-        items: [...projectNav, settingsNav].map((n) => ({
+        items: [...nav, { ...settingsNav, to: settingsTo }].map((n) => ({
           id: `nav-${n.id}`,
           label: n.label,
           icon: <n.icon />,
@@ -379,10 +391,14 @@ export function AppShell() {
       {
         heading: 'Actions',
         items: [
-          { id: 'run-suite', label: 'Run suite…', icon: <Play />, keywords: ['start', 'execute'], onSelect: () => navigate({ to: '/o/$org/p/$project/runs', params, search: {} }) },
-          { id: 'new-suite', label: 'New suite…', icon: <Layers />, onSelect: () => navigate({ to: '/o/$org/p/$project/suites/new', params }) },
-          { id: 'new-dataset', label: 'New dataset…', icon: <Database />, keywords: ['import', 'upload'], onSelect: () => navigate({ to: '/o/$org/p/$project/datasets', params }) },
-          { id: 'new-project', label: 'New project…', icon: <Plus />, onSelect: () => navigate({ to: '/onboarding' }) },
+          ...(project
+            ? [
+                { id: 'run-suite', label: 'Run suite…', icon: <Play />, keywords: ['start', 'execute'], onSelect: () => navigate({ to: '/o/$org/p/$project/runs', params, search: {} }) },
+                { id: 'new-suite', label: 'New suite…', icon: <Layers />, onSelect: () => navigate({ to: '/o/$org/p/$project/suites/new', params }) },
+                { id: 'new-dataset', label: 'New dataset…', icon: <Database />, keywords: ['import', 'upload'], onSelect: () => navigate({ to: '/o/$org/p/$project/datasets', params }) },
+              ]
+            : []),
+          { id: 'new-project', label: 'New project…', icon: <Plus />, onSelect: () => navigate({ to: '/onboarding', search: { org: org.slug } }) },
           {
             id: 'toggle-theme',
             label: resolved === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
@@ -446,7 +462,7 @@ export function AppShell() {
             shortcut={['G', ',']}
             active={pathname.includes('/settings')}
           >
-            <Link to="/o/$org/p/$project/settings" params={params}>
+            <Link to={settingsTo} params={params}>
               <Settings />
               {!railCollapsed && <span className="flex-1 truncate">Settings</span>}
             </Link>
@@ -454,7 +470,15 @@ export function AppShell() {
         }
       >
         <SidebarSection>
-          {projectNav.map((n) => {
+          {!project && (
+            <SidebarItem asChild icon={<FolderOpen />} label="Projects" active={!pathname.includes('/settings')}>
+              <Link to="/o/$org" params={{ org: org.slug }}>
+                <FolderOpen />
+                {!railCollapsed && <span className="flex-1 truncate">Projects</span>}
+              </Link>
+            </SidebarItem>
+          )}
+          {nav.map((n) => {
             const active = pathname.includes(`/p/${params.project}/${n.id}`)
             return (
               <SidebarItem key={n.id} asChild icon={<n.icon />} label={n.label} active={active} shortcut={['G', n.key.toUpperCase()]}>

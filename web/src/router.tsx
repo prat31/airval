@@ -9,7 +9,8 @@
  */
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Outlet, redirect } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { EntryRedirect, OrgIndexRedirect, WorkspaceGate } from './features/auth/guard'
+import { EntryRedirect, OrgGate, WorkspaceGate } from './features/auth/guard'
+import { OrgHomeScreen } from './features/auth/org-home'
 import { OnboardingScreen, validateOnboardingSearch } from './features/auth/onboarding'
 import { AuthLayout, LoginScreen, SetupScreen } from './features/auth/screens'
 import { CompareScreen } from './features/compare/compare'
@@ -61,7 +62,23 @@ const onboardingRoute = createRoute({
 
 // Organization → first project.
 const orgRoute = createRoute({ getParentRoute: () => rootRoute, path: '/o/$org', component: Outlet })
-const orgIndex = createRoute({ getParentRoute: () => orgRoute, path: '/', component: OrgIndexRedirect })
+// Org-level pages render in the shell with no project selected (an org may have zero projects).
+const orgShell = createRoute({ getParentRoute: () => orgRoute, id: 'org-shell', component: OrgGate })
+const orgIndex = createRoute({ getParentRoute: () => orgShell, path: '/', component: OrgHomeScreen, staticData: { crumb: 'Projects' } })
+const orgSettingsRoute = createRoute({ getParentRoute: () => orgShell, path: 'settings', component: SettingsLayout, staticData: { crumb: 'Settings' } })
+const orgSettingsIndex = createRoute({
+  getParentRoute: () => orgSettingsRoute,
+  path: '/',
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: '/o/$org/settings/$section', params: { ...params, section: 'general' } })
+  },
+})
+const orgSettingsSectionRoute = createRoute({
+  getParentRoute: () => orgSettingsRoute,
+  path: '$section',
+  component: SettingsSectionScreen,
+  staticData: { crumb: (p) => sectionLabel(p.section ?? '') },
+})
 
 // Project shell (rendered once session, org and project are resolved).
 const projectRoute = createRoute({ getParentRoute: () => orgRoute, path: 'p/$project', component: WorkspaceGate })
@@ -135,7 +152,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   authLayout.addChildren([loginRoute, setupRoute, onboardingRoute]),
   orgRoute.addChildren([
-    orgIndex,
+    orgShell.addChildren([orgIndex, orgSettingsRoute.addChildren([orgSettingsIndex, orgSettingsSectionRoute])]),
     projectRoute.addChildren([
       projectIndex,
       overviewRoute,

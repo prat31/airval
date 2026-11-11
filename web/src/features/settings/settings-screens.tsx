@@ -32,7 +32,8 @@ import { SecretPicker } from '../shared/secrets'
 function SectionLink({ id, label, active, params, locked }: { id: string; label: string; active: boolean; params: { org: string; project: string }; locked?: boolean }) {
   return (
     <Link
-      to="/o/$org/p/$project/settings/$section"
+      // Settings are org-wide; the same screens are reachable inside a project or at the org level.
+      to={params.project ? '/o/$org/p/$project/settings/$section' : '/o/$org/settings/$section'}
       params={{ ...params, section: id }}
       className={cn('flex h-8 shrink-0 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors focus-ring', active ? 'bg-surface text-text shadow-[0_0_0_1px_var(--border)]' : 'text-text-2 hover:bg-surface-hover hover:text-text')}
     >

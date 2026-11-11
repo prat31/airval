@@ -126,7 +126,7 @@ export function NewOrgDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         onSuccess: (o) => {
           onOpenChange(false)
           setName('')
-          navigate({ to: '/onboarding', search: { org: o.slug } })
+          navigate({ to: '/o/$org', params: { org: o.slug } })
         },
         onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Could not create the organization'),
       },

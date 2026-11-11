@@ -4,12 +4,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, Navigate, useParams, useRouterState } from '@tanstack/react-router'
-import { RotateCw } from 'lucide-react'
+import { Plus, RotateCw } from 'lucide-react'
 import { AppShell } from '@/app/shell'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { isUnauthorized, meQuery, projectsQuery, setupStatusQuery } from './api'
+import { NewOrgDialog } from './workspace-dialogs'
 
 /** Calm full-frame placeholder that matches the shell layout while the workspace loads. */
 function ShellSkeleton() {
@@ -83,30 +84,51 @@ export function EntryRedirect() {
   if (setup.error) return <GateError error={setup.error} retry={() => setup.refetch()} />
   if (isUnauthorized(me.error)) return login
   if (me.error) return <GateError error={me.error} retry={() => me.refetch()} />
-  if (me.data && !org) return <Navigate to="/onboarding" replace />
+  if (me.data && !org) return <NoOrganization />
   if (projects.data) {
     const first = projects.data[0]
-    if (!first) return <Navigate to="/onboarding" replace />
+    if (!first) return <Navigate to="/o/$org" params={{ org: org!.slug }} replace />
     return <Navigate to="/o/$org/p/$project/overview" params={{ org: org!.slug, project: first.slug }} replace />
   }
   return <ShellSkeleton />
 }
 
-/** `/o/$org` → that org's first project. */
-export function OrgIndexRedirect() {
+/** A signed-in user who belongs to no organization: say so and let them create one. */
+function NoOrganization() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
+      <NewOrgDialog open={open} onOpenChange={setOpen} />
+      <EmptyState
+        illustration="generic"
+        title="You’re not in an organization yet"
+        description="Create one to start adding projects, or ask an admin to invite you to theirs."
+        action={
+          <Button variant="primary" icon={<Plus />} onClick={() => setOpen(true)}>
+            Create organization
+          </Button>
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * Org-level pages (`/o/$org`, `/o/$org/settings/…`): the app shell with no project selected, so an
+ * organization with zero projects is a normal, navigable state.
+ */
+export function OrgGate() {
   const { org: orgSlug } = useParams({ strict: false }) as { org: string }
   const me = useQuery(meQuery)
   const org = me.data?.orgs.find((o) => o.slug === orgSlug)
   const projects = useQuery({ ...projectsQuery(org?.id ?? ''), enabled: !!org })
   const login = useLoginRedirect()
   if (isUnauthorized(me.error)) return login
+  if (me.error) return <GateError error={me.error} retry={() => me.refetch()} />
   if (me.data && !org) return <Navigate to="/" replace />
-  if (projects.data) {
-    const first = projects.data[0]
-    if (!first) return <Navigate to="/onboarding" search={{ org: orgSlug }} replace />
-    return <Navigate to="/o/$org/p/$project/overview" params={{ org: orgSlug, project: first.slug }} replace />
-  }
-  return <ShellSkeleton />
+  if (projects.error) return <GateError error={projects.error} retry={() => projects.refetch()} />
+  if (!projects.data) return <ShellSkeleton />
+  return <AppShell />
 }
 
 /** Renders the app shell only once the session, org and project are resolved. */
@@ -124,7 +146,7 @@ export function WorkspaceGate() {
   if (!projects.data) return <ShellSkeleton />
   if (!projects.data.some((p) => p.slug === params.project)) {
     const first = projects.data[0]
-    if (!first) return <Navigate to="/onboarding" search={{ org: params.org }} replace />
+    if (!first) return <Navigate to="/o/$org" params={{ org: params.org }} replace />
     return (
       <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
         <EmptyState

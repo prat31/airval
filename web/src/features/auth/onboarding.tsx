@@ -4,7 +4,7 @@
  * first step. Progress lives in the URL (`?org&project&step`), so a reload resumes where you were.
  */
 import { useQuery } from '@tanstack/react-query'
-import { Link, Navigate, useNavigate, useSearch } from '@tanstack/react-router'
+import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
 import { ArrowLeft, ArrowRight, Check, Database, FileUp, Play, Sparkles, Wand2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -61,16 +61,31 @@ interface Draft {
   evaluators?: { evaluator: S['Evaluator']; threshold?: number }[]
 }
 
+/**
+ * "Skip setup": leave the wizard from any step. Opens the project being set up (or the org's first);
+ * with none, the organization home, which handles zero projects. Nothing is created on the user's behalf.
+ */
+function useSkipSetup(org: { slug: string } | undefined, existing: ApiProject | undefined) {
+  const navigate = useNavigate()
+  return () => {
+    if (!org) return
+    if (existing) void navigate({ to: '/o/$org/p/$project/overview', params: { org: org.slug, project: existing.slug }, replace: true })
+    else void navigate({ to: '/o/$org', params: { org: org.slug }, replace: true })
+  }
+}
+
 export function OnboardingScreen() {
   const search = useSearch({ strict: false }) as OnboardingSearch
   const navigate = useNavigate()
   const me = useQuery(meQuery)
   const org = me.data?.orgs.find((o) => o.slug === search.org) ?? me.data?.orgs[0]
-  const projects = useQuery({ ...projectsQuery(org?.id ?? ''), enabled: !!org && !!search.project })
+  const projects = useQuery({ ...projectsQuery(org?.id ?? ''), enabled: !!org })
   const project = projects.data?.find((p) => p.slug === search.project)
   const [draft, setDraft] = useState<Draft>({})
+  const skip = useSkipSetup(org, project ?? projects.data?.[0])
 
   if (isUnauthorized(me.error)) return <Navigate to="/login" search={{ next: '/onboarding' }} replace />
+  if (me.data && !org) return <Navigate to="/" replace />
 
   const step = project ? Math.max(1, search.step ?? 1) : 0
   const go = (next: number, p: ApiProject | undefined = project) =>
@@ -122,12 +137,12 @@ export function OnboardingScreen() {
           <RunStep project={project} orgSlug={org.slug} draft={draft} onBack={() => go(3)} onRestart={() => go(1)} />
         )}
       </div>
-      {project && (
+      {org && projects.data && (
         <p className="text-center text-xs text-text-muted">
           Prefer to explore first?{' '}
-          <Link to="/o/$org/p/$project/overview" params={{ org: org!.slug, project: project.slug }} className="font-medium text-accent hover:underline">
-            Skip to the project
-          </Link>
+          <button type="button" onClick={skip} className="rounded-sm font-medium text-accent hover:underline focus-ring">
+            Skip setup
+          </button>
         </p>
       )}
     </div>
