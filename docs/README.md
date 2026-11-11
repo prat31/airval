@@ -1,4 +1,8 @@
+<img src="assets/logo.svg" alt="" width="48" align="left">
+
 # airval documentation
+
+<br clear="left">
 
 airval is a self-hostable evaluation platform for AI services. Register the service you want to test (a **Target**),
 build versioned **Datasets**, define **Suites** of **Evaluators** with **Gates**, run them manually, on a schedule, from

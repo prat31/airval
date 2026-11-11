@@ -7,16 +7,12 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api/client'
+import { BrandMark } from '@/components/brand/brand'
 import { authProvidersQuery } from '@/lib/edition'
 import { setupStatusQuery, slugify, useLogin, useSetup } from './api'
 
 export function Logo({ size = 8 }: { size?: 6 | 8 }) {
-  return (
-    <svg viewBox="0 0 24 24" className={size === 8 ? 'size-8' : 'size-6'} aria-hidden>
-      <rect width="24" height="24" rx="6" fill="var(--accent)" />
-      <path d="M6.6 17 11.3 7h1.4L17.4 17h-2.3l-1-2.2h-4.2l-1 2.2H6.6Zm4.2-4h2.5L12 10.1 10.8 13Z" fill="var(--on-accent)" />
-    </svg>
-  )
+  return <BrandMark className={size === 8 ? 'size-8' : 'size-6'} />
 }
 
 /** Centered, chrome-less layout for /login, /setup and /onboarding. */

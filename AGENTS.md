@@ -76,6 +76,9 @@ plan/                numbered plans (001.md, 002.md…). New big direction = new
 - Big changes start with a plan file in `plan/NNN.md`. Keep plans updated when decisions change.
 - `make check` (lint + tests for Go and web) must pass. Store code runs its tests against **both** SQLite and Postgres.
 - Every new evaluator or target adapter ships with unit tests and a docs entry.
+- Brand: the logo is the "monogram a" mark (`web/src/components/brand/brand.tsx`, colors `--brand-mark` /
+  `--brand-mark-ink`). Never redraw it; static assets (favicons, PWA icons, `docs/assets/logo*`, social preview) are
+  generated from the same geometry by `node web/scripts/brand-assets.mjs`.
 - Use the design tokens and existing UI primitives. Any new chart follows the chart rules in `plan/001.md §Design system`.
 - Keep the binary CGO-free.
 - Don't add infrastructure dependencies (beyond Postgres + NATS) without a plan entry.

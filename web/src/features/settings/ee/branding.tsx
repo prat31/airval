@@ -7,6 +7,7 @@ import { CardBody, CardFooter } from '@/components/ui/card'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
+import { BrandMark } from '@/components/brand/brand'
 import { cn } from '@/lib/cn'
 import { useEdition } from '@/lib/edition'
 import { http, unwrap, type S } from '../../shared/api'
@@ -149,10 +150,5 @@ export function BrandingSettings() {
 }
 
 export function DefaultMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={cn('size-8 shrink-0', className)} aria-hidden>
-      <rect width="24" height="24" rx="6" fill="var(--accent)" />
-      <path d="M6.6 17 11.3 7h1.4L17.4 17h-2.3l-1-2.2h-4.2l-1 2.2H6.6Zm4.2-4h2.5L12 10.1 10.8 13Z" fill="var(--on-accent)" />
-    </svg>
-  )
+  return <BrandMark className={className} />
 }

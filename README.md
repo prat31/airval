@@ -1,6 +1,14 @@
 <div align="center">
 
-# airval
+<a href="https://github.com/prat31/airval">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-wordmark-dark.png">
+    <img src="docs/assets/logo-wordmark.png" alt="airval" height="64">
+  </picture>
+</a>
+
+<br>
+<br>
 
 **Self-hosted evaluation for AI services.**
 Test your LLM apps, RAG pipelines and agents against real datasets. Score every answer, gate every release,

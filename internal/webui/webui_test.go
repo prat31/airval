@@ -43,3 +43,15 @@ func TestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestManifestContentType(t *testing.T) {
+	h := Handler(fstest.MapFS{
+		"index.html":       {Data: []byte("<html>app</html>")},
+		"site.webmanifest": {Data: []byte(`{"name":"airval"}`)},
+	})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/site.webmanifest", nil))
+	if got := rec.Header().Get("Content-Type"); got != "application/manifest+json" {
+		t.Fatalf("Content-Type = %q, want application/manifest+json", got)
+	}
+}

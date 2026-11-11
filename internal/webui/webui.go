@@ -5,6 +5,7 @@ package webui
 import (
 	"bytes"
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/prat31/airval"
 )
+
+// The web app manifest's extension is missing from Go's (and many systems') MIME tables.
+func init() { _ = mime.AddExtensionType(".webmanifest", "application/manifest+json") }
 
 // Embedded returns the UI filesystem rooted at web/dist.
 func Embedded() fs.FS {

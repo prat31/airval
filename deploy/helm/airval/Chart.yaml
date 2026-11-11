@@ -1,6 +1,7 @@
 apiVersion: v2
 name: airval
 description: Self-hostable evaluation platform for AI services (server, workers, migrations, NATS JetStream, optional CloudNativePG).
+icon: https://raw.githubusercontent.com/prat31/airval/main/docs/assets/logo-256.png
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

@@ -40,6 +40,10 @@
   --accent-subtle: var(--iris-50);
   --on-accent: #ffffff;
 
+  /* Brand mark: the same in light and dark (follows a white-label accent ramp) */
+  --brand-mark: var(--iris-600);
+  --brand-mark-ink: #ffffff;
+
   /* Status (reserved; never chart series; always icon + label) */
   --pass: #12a150;
   --fail: #e0383e;
