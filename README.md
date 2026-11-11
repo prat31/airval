@@ -90,6 +90,11 @@ On GitHub Actions use the bundled composite action, which also posts/updates a P
     project: <project-id>
 ```
 
+## Documentation
+
+Full docs are in [`docs/`](docs/README.md): getting started, concepts, Targets, Datasets, Evaluators, Gates, Runs, CI,
+performance, deployment, configuration, API, security and contributing.
+
 ## Configuration
 
 YAML file (`--config` / `AIRVAL_CONFIG`) plus `AIRVAL_*` env overrides: strip the prefix, lower-case, and the first
