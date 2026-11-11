@@ -8,3 +8,5 @@ web/dist/*
 *.db-*
 .env
 coverage.out
+
+.claude/worktrees/

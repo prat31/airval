@@ -1,0 +1,14 @@
+airval Enterprise License (placeholder)
+
+Copyright (c) 2026 the airval authors. All rights reserved.
+
+The files under the ee/ directory of this repository ("Enterprise Features") are NOT licensed under
+the Apache License 2.0 that covers the rest of this repository.
+
+You may view the source of the Enterprise Features, and you may use, modify and run them for
+development and testing purposes only. Any production use, distribution, sublicensing or
+offering of the Enterprise Features as a service requires a valid commercial subscription
+agreement with the airval authors.
+
+THE ENTERPRISE FEATURES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. This placeholder will be
+replaced by the final commercial license text before the first enterprise release.
