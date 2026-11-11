@@ -214,7 +214,7 @@ func configCmd(cfg func() string) *cobra.Command {
 		Use:   "print",
 		Short: "Print the effective configuration (secrets redacted)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			c, err := config.Load(config.Mode(mode), cfg())
+			c, err := config.LoadUnvalidated(config.Mode(mode), cfg())
 			if err != nil {
 				return err
 			}

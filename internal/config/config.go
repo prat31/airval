@@ -161,8 +161,17 @@ func defaults(mode Mode) map[string]any {
 	return d
 }
 
-// Load reads configuration. path may be empty (then AIRVAL_CONFIG is consulted).
+// Load reads configuration and validates it for mode. path may be empty (then AIRVAL_CONFIG is consulted).
 func Load(mode Mode, path string) (*Config, error) {
+	c, err := LoadUnvalidated(mode, path)
+	if err != nil {
+		return nil, err
+	}
+	return c, c.Validate(mode)
+}
+
+// LoadUnvalidated reads configuration with mode defaults but skips validation (config print).
+func LoadUnvalidated(mode Mode, path string) (*Config, error) {
 	k := koanf.New(".")
 	if err := k.Load(confmap.Provider(defaults(mode), "."), nil); err != nil {
 		return nil, err
@@ -182,7 +191,7 @@ func Load(mode Mode, path string) (*Config, error) {
 	if err := k.UnmarshalWithConf("", &c, koanf.UnmarshalConf{Tag: "koanf"}); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
-	return &c, c.Validate(mode)
+	return &c, nil
 }
 
 func envKey(k, v string) (string, any) {
