@@ -42,6 +42,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/cn'
 import { modKey, useHotkeys, useMediaQuery } from '@/lib/hotkeys'
 import { useTheme, type ThemePreference } from '@/lib/theme'
+import { useCrumbNames } from './crumb-names'
 import { LiveRunIndicator } from './live-runs'
 import { projectNav, settingsNav } from './nav'
 import { ShortcutsSheet } from './shortcuts-sheet'
@@ -259,6 +260,7 @@ declare module '@tanstack/react-router' {
 function useCrumbs(): Crumb[] {
   const matches = useMatches()
   const { org, project } = useWorkspace()
+  const names = useCrumbNames(project?.id)
   return useMemo(() => {
     const crumbs: Crumb[] = []
     if (project) crumbs.push({ label: project.name, href: `/o/${org.slug}/p/${project.slug}/overview`, icon: <ProjectDot project={project} /> })
@@ -267,12 +269,13 @@ function useCrumbs(): Crumb[] {
       if (!c) continue
       const parent = m.staticData?.parentCrumb
       if (parent && project) crumbs.push({ label: parent.label, href: `/o/${org.slug}/p/${project.slug}/${parent.path}` })
-      const label = typeof c === 'function' ? c(m.params as Record<string, string>) : c
+      const entity = (['run', 'suite', 'dataset', 'target'] as const).find((e) => m.routeId.endsWith(`$${e}`))
+      const label = (entity && names[entity]) || (typeof c === 'function' ? c(m.params as Record<string, string>) : c)
       if (crumbs.at(-1)?.label === label) continue
       crumbs.push({ label, href: m.pathname })
     }
     return crumbs
-  }, [matches, org.slug, project])
+  }, [matches, org.slug, project, names.run, names.suite, names.dataset, names.target])
 }
 
 function TopBar({ onToggleSidebar, onOpenPalette, onShortcuts }: { onToggleSidebar: () => void; onOpenPalette: () => void; onShortcuts: () => void }) {
