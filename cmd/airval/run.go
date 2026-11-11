@@ -429,7 +429,7 @@ func (r runView) passed() bool {
 }
 
 type progressUpdate struct {
-	run                                runView
+	run                               runView
 	completed, failed, errored, total int
 }
 
