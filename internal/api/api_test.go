@@ -220,7 +220,7 @@ func TestAPIEndToEnd(t *testing.T) {
 			t.Fatal("webhook secret leaked in list")
 		}
 	}
-	owner.do("POST", "/v1/runs", obj{"suite_id": sid}, 501, nil)
+	owner.do("POST", "/v1/runs", obj{"suite_id": sid}, 503, nil) // no queue in this test server
 
 	// Secrets are write-only.
 	var sec obj
@@ -333,7 +333,7 @@ func TestAPIEndToEnd(t *testing.T) {
 		t.Fatal("spa fallback")
 	}
 	owner.do("GET", "/v1/does-not-exist", nil, 404, nil)
-	owner.do("POST", "/hooks/"+wh["id"].(string), obj{}, 501, nil)
+	owner.do("POST", "/hooks/"+wh["id"].(string), obj{}, 401, nil) // unsigned
 	owner.do("GET", "/v1/auth/oidc/google/start", nil, 501, nil)
 	owner.do("GET", "/v1/meta", nil, 200, nil)
 

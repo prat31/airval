@@ -159,48 +159,4 @@ func (s *Server) ListRunAggregates(ctx context.Context, req gen.ListRunAggregate
 	return gen.ListRunAggregates200JSONResponse{Items: mapSlice(aggs, toAggregate)}, nil
 }
 
-// ---- execution endpoints: implemented by the engine workstream ----
-
-func (s *Server) CreateRun(ctx context.Context, req gen.CreateRunRequestObject) (gen.CreateRunResponseObject, error) {
-	if req.Body == nil {
-		return nil, invalid("suite_id is required")
-	}
-	if _, err := s.suite(ctx, req.Body.SuiteId, store.RoleEditor); err != nil {
-		return nil, err
-	}
-	// TODO(engine): resolve suite → plan shards → s.Queue.PublishJobs; return the created runs (milestone 6).
-	return nil, notImplemented("run creation")
-}
-
-func (s *Server) CancelRun(ctx context.Context, req gen.CancelRunRequestObject) (gen.CancelRunResponseObject, error) {
-	if _, err := s.run(ctx, req.Run, store.RoleEditor); err != nil {
-		return nil, err
-	}
-	// TODO(engine): s.Queue.SetCancel + TransitionRun(queued|running → canceled) (milestone 6).
-	return nil, notImplemented("run cancellation")
-}
-
-func (s *Server) RerunFailed(ctx context.Context, req gen.RerunFailedRequestObject) (gen.RerunFailedResponseObject, error) {
-	if _, err := s.run(ctx, req.Run, store.RoleEditor); err != nil {
-		return nil, err
-	}
-	// TODO(engine): child run over failed/errored results (milestone 6).
-	return nil, notImplemented("re-run failed")
-}
-
-func (s *Server) RescoreRun(ctx context.Context, req gen.RescoreRunRequestObject) (gen.RescoreRunResponseObject, error) {
-	if _, err := s.run(ctx, req.Run, store.RoleEditor); err != nil {
-		return nil, err
-	}
-	// TODO(engine): child run with JobRescore jobs reusing outputs (milestone 6).
-	return nil, notImplemented("re-score")
-}
-
-func (s *Server) StreamRunEvents(ctx context.Context, req gen.StreamRunEventsRequestObject) (gen.StreamRunEventsResponseObject, error) {
-	if _, err := s.run(ctx, req.Run, store.RoleViewer); err != nil {
-		return nil, err
-	}
-	// TODO(engine): return a custom response object whose VisitStreamRunEventsResponse writes SSE from
-	// s.Queue.SubscribeEvents(ctx, runID, lastEventID) and flushes per event (milestone 6).
-	return nil, notImplemented("run events stream")
-}
+// Execution endpoints (create, cancel, re-run failed, re-score, live events) live in handlers_engine.go.
