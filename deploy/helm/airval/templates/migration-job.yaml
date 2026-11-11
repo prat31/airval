@@ -25,6 +25,7 @@ spec:
       restartPolicy: OnFailure
       # Hook resources are created before the chart's ServiceAccount, and migrations need no Kubernetes API access.
       automountServiceAccountToken: false
+      enableServiceLinks: false
       {{- with .Values.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

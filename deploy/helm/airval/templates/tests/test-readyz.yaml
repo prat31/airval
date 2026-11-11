@@ -16,6 +16,15 @@ spec:
   containers:
     - name: readyz
       image: "{{ .Values.test.image.repository }}:{{ .Values.test.image.tag }}"
-      command: ["wget", "-q", "-O", "-", "--tries=30", "--timeout=5", "--waitretry=2", "--retry-connrefused", "http://{{ include "airval.fullname" . }}:{{ .Values.server.service.port }}/readyz"]
+      # BusyBox wget has no retry flags: poll for up to 2 minutes.
+      command:
+        - sh
+        - -c
+        - |
+          for i in $(seq 1 60); do
+            wget -q -T 5 -O - "http://{{ include "airval.fullname" . }}:{{ .Values.server.service.port }}/readyz" && exit 0
+            sleep 2
+          done
+          exit 1
       securityContext:
         {{- toYaml .Values.securityContext | nindent 8 }}

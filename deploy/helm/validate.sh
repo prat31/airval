@@ -20,7 +20,7 @@ run_kubeconform() {
   else docker run --rm -i -v "$OUT:/out" "$KUBECONFORM_IMAGE" "$@"; fi
 }
 
-run_helm dependency build "$CHART"
+run_helm dependency build "$CHART" || run_helm dependency update "$CHART" # build needs a configured repo when Chart.lock exists
 for v in "$CHART"/ci/*-values.yaml; do
   name=$(basename "$v" .yaml)
   echo "== $name"

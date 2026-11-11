@@ -21,7 +21,7 @@ helm test airval -n airval                         # GET /readyz through the Ser
 | worker Deployment, PDB, HPA **or** KEDA ScaledObject | KEDA scales on JetStream consumer lag (`RUNS_JOBS`/`workers`); workers expose no HTTP port, so they have no probes |
 | migration Job | `airval migrate up` as a pre-install/pre-upgrade hook |
 | NATS | official `nats` subchart (JetStream, 3 replicas) or `nats.enabled=false` + `nats.external.url` |
-| Postgres | `postgresql.external.url` / `existingSecret` (recommended) or `postgresql.cnpg.enabled` (evaluation only; needs the CloudNativePG operator) |
+| Postgres | `postgresql.external.url` / `existingSecret` (recommended), `postgresql.cnpg.enabled` (evaluation; needs the CloudNativePG operator) or `postgresql.dev.enabled` (single-pod Postgres for kind/minikube/CI; no backups, no HA) |
 | Ingress or Gateway API HTTPRoute | mutually exclusive; configure `config.baseUrl` to match |
 | ServiceMonitor, NetworkPolicy | optional |
 
@@ -39,7 +39,7 @@ Back up the master key: losing it makes every stored secret unreadable. Rotate w
 
 ## Notes
 
-* Migrations run as a hook before the new pods roll out. With `postgresql.cnpg.enabled` the database does not exist
+* Migrations run as a hook before the new pods roll out. With `postgresql.cnpg.enabled` or `postgresql.dev.enabled` the database does not exist
   before install, so the server migrates itself on first start and the Job runs on upgrades only.
 * Server pods are stateless; scale `server.replicaCount` or enable `server.autoscaling`.
 * Behind ingress-nginx raise `nginx.ingress.kubernetes.io/proxy-read-timeout` (run progress streams over SSE).
