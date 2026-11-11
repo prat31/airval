@@ -9,13 +9,17 @@
  */
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Outlet, redirect } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { AppShell } from './app/shell'
-import { defaultOrg, defaultProject } from './app/workspace'
-import { AuthLayout, LoginScreen, SetupScreen } from './routes/auth'
-import { CompareScreen } from './routes/compare'
+import { EntryRedirect, OrgIndexRedirect, WorkspaceGate } from './features/auth/guard'
+import { OnboardingScreen } from './features/auth/onboarding'
+import { AuthLayout, LoginScreen, SetupScreen } from './features/auth/screens'
+import { CompareScreen } from './features/compare/compare'
+import { validateCompareSearch } from './features/compare/search'
+import { OverviewScreen } from './features/overview/overview'
+import { RunDetailScreen } from './features/runs/run-detail'
+import { RunsScreen } from './features/runs/runs-list'
+import { shortId } from './features/runs/ui'
+import { validateRunDetailSearch, validateRunsSearch } from './features/runs/search'
 import { ErrorScreen, NotFoundScreen } from './routes/not-found'
-import { OnboardingScreen } from './routes/onboarding'
-import { OverviewScreen } from './routes/overview'
 import {
   DatasetDetailScreen,
   DatasetsScreen,
@@ -26,7 +30,6 @@ import {
   TargetDetailScreen,
   TargetsScreen,
 } from './routes/placeholders'
-import { RunDetailScreen, RunsScreen } from './routes/runs'
 import { SettingsLayout, SettingsSectionScreen } from './routes/settings'
 import { SuiteNewScreen } from './routes/suite-new'
 
@@ -36,34 +39,31 @@ const rootRoute = createRootRoute({
   errorComponent: ({ error }) => <ErrorScreen error={error instanceof Error ? error : new Error(String(error))} />,
 })
 
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/o/$org/p/$project/overview', params: { org: defaultOrg, project: defaultProject } })
-  },
-})
+// Resolves setup → session → first org → first project.
+const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: EntryRedirect })
 
 // Chrome-less auth / onboarding.
 const authLayout = createRoute({ getParentRoute: () => rootRoute, id: 'auth', component: AuthLayout })
-const loginRoute = createRoute({ getParentRoute: () => authLayout, path: '/login', component: LoginScreen })
+const loginRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/login',
+  component: LoginScreen,
+  validateSearch: (s: Record<string, unknown>): { next?: string } => (typeof s.next === 'string' ? { next: s.next } : {}),
+})
 const setupRoute = createRoute({ getParentRoute: () => authLayout, path: '/setup', component: SetupScreen })
-const onboardingRoute = createRoute({ getParentRoute: () => authLayout, path: '/onboarding', component: OnboardingScreen })
-
-// Organization → first project.
-const orgRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/o/$org',
-  beforeLoad: ({ params, location }) => {
-    if (location.pathname.replace(/\/$/, '') === `/o/${params.org}`) {
-      // TODO(milestone 2): resolve the org's first project from the API.
-      throw redirect({ to: '/o/$org/p/$project/overview', params: { org: params.org, project: defaultProject } })
-    }
-  },
+const onboardingRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/onboarding',
+  component: OnboardingScreen,
+  validateSearch: (s: Record<string, unknown>): { org?: string } => (typeof s.org === 'string' ? { org: s.org } : {}),
 })
 
-// Project shell.
-const projectRoute = createRoute({ getParentRoute: () => orgRoute, path: 'p/$project', component: AppShell })
+// Organization → first project.
+const orgRoute = createRoute({ getParentRoute: () => rootRoute, path: '/o/$org', component: Outlet })
+const orgIndex = createRoute({ getParentRoute: () => orgRoute, path: '/', component: OrgIndexRedirect })
+
+// Project shell (rendered once session, org and project are resolved).
+const projectRoute = createRoute({ getParentRoute: () => orgRoute, path: 'p/$project', component: WorkspaceGate })
 const projectIndex = createRoute({
   getParentRoute: () => projectRoute,
   path: '/',
@@ -77,19 +77,26 @@ const route = <TPath extends string>(path: TPath, component: () => ReactNode, cr
   createRoute({ getParentRoute: () => projectRoute, path, component, staticData: { crumb, parentCrumb } })
 
 const overviewRoute = route('overview', OverviewScreen, 'Overview')
-const runsRoute = route('runs', RunsScreen, 'Runs')
+const runsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: 'runs',
+  component: RunsScreen,
+  staticData: { crumb: 'Runs' },
+  validateSearch: validateRunsSearch,
+})
 const runRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: 'runs/$run',
   component: RunDetailScreen,
-  staticData: { crumb: (p) => p.run ?? 'Run', parentCrumb: { label: 'Runs', path: 'runs' } },
+  staticData: { crumb: (p) => (p.run ? `Run ${shortId(p.run)}` : 'Run'), parentCrumb: { label: 'Runs', path: 'runs' } },
+  validateSearch: validateRunDetailSearch,
 })
 const compareRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: 'compare',
   component: CompareScreen,
   staticData: { crumb: 'Compare', parentCrumb: { label: 'Runs', path: 'runs' } },
-  validateSearch: (s: Record<string, unknown>): { runs?: string } => (typeof s.runs === 'string' ? { runs: s.runs } : {}),
+  validateSearch: validateCompareSearch,
 })
 const suitesRoute = route('suites', SuitesScreen, 'Suites')
 const suiteNewRoute = route('suites/new', SuiteNewScreen, 'New suite', { label: 'Suites', path: 'suites' })
@@ -127,6 +134,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   authLayout.addChildren([loginRoute, setupRoute, onboardingRoute]),
   orgRoute.addChildren([
+    orgIndex,
     projectRoute.addChildren([
       projectIndex,
       overviewRoute,
