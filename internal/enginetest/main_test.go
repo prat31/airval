@@ -16,5 +16,7 @@ func TestMain(m *testing.M) {
 		goleak.IgnoreAnyFunction("github.com/klauspost/compress/zstd.(*blockDec).startDecoder"),
 		goleak.IgnoreAnyFunction("database/sql.(*DB).connectionOpener"),
 		goleak.IgnoreAnyFunction("go.opencensus.io/stats/view.(*worker).start"),
+		// nats.go tears subscription goroutines down asynchronously after the connection closes.
+		goleak.IgnoreAnyFunction("github.com/nats-io/nats.go.(*Conn).waitForMsgs"),
 	)
 }
