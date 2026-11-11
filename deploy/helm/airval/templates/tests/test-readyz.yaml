@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "airval.fullname" . }}-test-readyz
+  labels:
+    {{- include "airval.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 4 }}
+  containers:
+    - name: readyz
+      image: "{{ .Values.test.image.repository }}:{{ .Values.test.image.tag }}"
+      command: ["wget", "-q", "-O", "-", "--tries=30", "--timeout=5", "--waitretry=2", "--retry-connrefused", "http://{{ include "airval.fullname" . }}:{{ .Values.server.service.port }}/readyz"]
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}

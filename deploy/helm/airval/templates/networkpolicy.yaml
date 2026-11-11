@@ -1,0 +1,49 @@
+{{- if .Values.networkPolicy.enabled }}
+# Server: accepts HTTP from the configured sources; workers accept nothing. Both may reach DNS, Postgres, NATS and
+# HTTPS (evaluated targets and LLM providers) and any extra egress you add.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "airval.fullname" . }}-server
+  labels:
+    {{- include "airval.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "airval.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8080
+          protocol: TCP
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "airval.fullname" . }}-egress
+  labels:
+    {{- include "airval.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app.kubernetes.io/instance, operator: In, values: [{{ .Release.Name | quote }}]}
+      - {key: app.kubernetes.io/component, operator: In, values: [server, worker]}
+  policyTypes: [Egress]
+  egress:
+    - ports:
+        - {port: 53, protocol: UDP}
+        - {port: 53, protocol: TCP}
+    - ports:
+        - {port: {{ .Values.networkPolicy.databasePort }}, protocol: TCP}
+        - {port: 4222, protocol: TCP}
+        - {port: 443, protocol: TCP}
+        - {port: 80, protocol: TCP}
+    {{- with .Values.networkPolicy.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

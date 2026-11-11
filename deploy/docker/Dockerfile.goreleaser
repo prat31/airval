@@ -1,0 +1,17 @@
+# Used by goreleaser (dockers_v2): packages prebuilt binaries, no compilation here.
+# Build context layout: <os>/<arch>/airval and <os>/<arch>/airval-probe.
+FROM --platform=$BUILDPLATFORM busybox:stable AS data
+RUN mkdir /data && chown 65532:65532 /data
+
+FROM gcr.io/distroless/static:nonroot
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/airval ${TARGETPLATFORM}/airval-probe /usr/local/bin/
+COPY --from=data /data /data
+WORKDIR /data
+VOLUME ["/data"]
+USER 65532:65532
+EXPOSE 8080
+ENV AIRVAL_SERVER_ADDR=":8080"
+# Distroless has no shell: healthcheck with ["CMD", "/usr/local/bin/airval-probe"].
+ENTRYPOINT ["/usr/local/bin/airval"]
+CMD ["server"]

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: airval
+description: Self-hostable evaluation platform for AI services (server, workers, migrations, NATS JetStream, optional CloudNativePG).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+home: https://github.com/airval/airval
+sources:
+  - https://github.com/airval/airval
+keywords: [evaluation, llm, ai, testing, observability]
+license: Apache-2.0
+dependencies:
+  - name: nats
+    version: 2.15.2
+    repository: https://nats-io.github.io/k8s/helm/charts/
+    condition: nats.enabled

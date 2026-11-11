@@ -2,9 +2,9 @@ package api
 
 import (
 	"context"
-	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -243,9 +243,18 @@ func (s *Server) DeleteNotificationChannel(ctx context.Context, req gen.DeleteNo
 }
 
 func (s *Server) TestNotificationChannel(ctx context.Context, req gen.TestNotificationChannelRequestObject) (gen.TestNotificationChannelResponseObject, error) {
-	if _, err := s.orgChannel(ctx, req.Org, req.Channel); err != nil {
+	c, err := s.orgChannel(ctx, req.Org, req.Channel)
+	if err != nil {
 		return nil, err
 	}
-	// TODO(wave): send through internal/webhooks outbound notifier (milestone 8).
-	return nil, errorf(http.StatusNotImplemented, "not_implemented", "notification delivery is not implemented yet")
+	base := "http://localhost:8080"
+	if s.Config != nil && s.Config.Server.BaseURL != "" {
+		base = strings.TrimRight(s.Config.Server.BaseURL, "/")
+	}
+	sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := s.sendNotification(sctx, c, sampleMessage(base, c.Name)); err != nil {
+		return nil, err
+	}
+	return gen.TestNotificationChannel204Response{}, nil
 }

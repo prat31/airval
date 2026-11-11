@@ -1,0 +1,4 @@
+# Minimal install (bundled NATS, external Postgres). Used by CI lint/template.
+postgresql:
+  external:
+    url: postgres://airval:pw@postgres.example.svc:5432/airval?sslmode=disable

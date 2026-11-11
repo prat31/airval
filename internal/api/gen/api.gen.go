@@ -135,7 +135,6 @@ const (
 	Huggingface DatasetImportRequestSourceKind = "huggingface"
 	Inline      DatasetImportRequestSourceKind = "inline"
 	Upload      DatasetImportRequestSourceKind = "upload"
-	Url         DatasetImportRequestSourceKind = "url"
 )
 
 // Valid indicates whether the value is a known member of the DatasetImportRequestSourceKind enum.
@@ -146,8 +145,6 @@ func (e DatasetImportRequestSourceKind) Valid() bool {
 	case Inline:
 		return true
 	case Upload:
-		return true
-	case Url:
 		return true
 	default:
 		return false
@@ -301,6 +298,27 @@ func (e EvaluatorKind) Valid() bool {
 	}
 }
 
+// Defines values for EvaluatorKindInfoCategory.
+const (
+	EvaluatorKindInfoCategoryDeterministic EvaluatorKindInfoCategory = "deterministic"
+	EvaluatorKindInfoCategoryHuman         EvaluatorKindInfoCategory = "human"
+	EvaluatorKindInfoCategoryModel         EvaluatorKindInfoCategory = "model"
+)
+
+// Valid indicates whether the value is a known member of the EvaluatorKindInfoCategory enum.
+func (e EvaluatorKindInfoCategory) Valid() bool {
+	switch e {
+	case EvaluatorKindInfoCategoryDeterministic:
+		return true
+	case EvaluatorKindInfoCategoryHuman:
+		return true
+	case EvaluatorKindInfoCategoryModel:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Degraded    HealthStatus = "degraded"
@@ -324,15 +342,18 @@ func (e HealthStatus) Valid() bool {
 
 // Defines values for HttpTargetConfigMethod.
 const (
-	GET   HttpTargetConfigMethod = "GET"
-	PATCH HttpTargetConfigMethod = "PATCH"
-	POST  HttpTargetConfigMethod = "POST"
-	PUT   HttpTargetConfigMethod = "PUT"
+	DELETE HttpTargetConfigMethod = "DELETE"
+	GET    HttpTargetConfigMethod = "GET"
+	PATCH  HttpTargetConfigMethod = "PATCH"
+	POST   HttpTargetConfigMethod = "POST"
+	PUT    HttpTargetConfigMethod = "PUT"
 )
 
 // Valid indicates whether the value is a known member of the HttpTargetConfigMethod enum.
 func (e HttpTargetConfigMethod) Valid() bool {
 	switch e {
+	case DELETE:
+		return true
 	case GET:
 		return true
 	case PATCH:
@@ -346,21 +367,18 @@ func (e HttpTargetConfigMethod) Valid() bool {
 	}
 }
 
-// Defines values for HttpTargetConfigStreaming.
+// Defines values for HttpTargetConfigStreamMode.
 const (
-	HttpTargetConfigStreamingNdjson HttpTargetConfigStreaming = "ndjson"
-	HttpTargetConfigStreamingNone   HttpTargetConfigStreaming = "none"
-	HttpTargetConfigStreamingSse    HttpTargetConfigStreaming = "sse"
+	Ndjson HttpTargetConfigStreamMode = "ndjson"
+	Sse    HttpTargetConfigStreamMode = "sse"
 )
 
-// Valid indicates whether the value is a known member of the HttpTargetConfigStreaming enum.
-func (e HttpTargetConfigStreaming) Valid() bool {
+// Valid indicates whether the value is a known member of the HttpTargetConfigStreamMode enum.
+func (e HttpTargetConfigStreamMode) Valid() bool {
 	switch e {
-	case HttpTargetConfigStreamingNdjson:
+	case Ndjson:
 		return true
-	case HttpTargetConfigStreamingNone:
-		return true
-	case HttpTargetConfigStreamingSse:
+	case Sse:
 		return true
 	default:
 		return false
@@ -922,21 +940,34 @@ type AnnotationUpdate struct {
 
 // AnthropicTargetConfig defines model for AnthropicTargetConfig.
 type AnthropicTargetConfig struct {
-	AnthropicVersion *string     `json:"anthropic_version,omitempty"`
-	ApiKeySecret     *string     `json:"api_key_secret,omitempty"`
-	BaseUrl          *string     `json:"base_url,omitempty"`
-	ExtraBody        *JSONObject `json:"extra_body,omitempty"`
-	JsonMode         *bool       `json:"json_mode,omitempty"`
-	MaxTokens        *int        `json:"max_tokens,omitempty"`
-	Model            *string     `json:"model,omitempty"`
+	AnthropicBeta    *string            `json:"anthropic_beta,omitempty"`
+	AnthropicVersion *string            `json:"anthropic_version,omitempty"`
+	ApiKey           *string            `json:"api_key,omitempty"`
+	BaseUrl          *string            `json:"base_url,omitempty"`
+	ExtraBody        *JSONObject        `json:"extra_body,omitempty"`
+	Headers          *map[string]string `json:"headers,omitempty"`
+	MaxConcurrency   *int               `json:"max_concurrency,omitempty"`
+	MaxResponseBytes *int64             `json:"max_response_bytes,omitempty"`
+	MaxTokens        *int               `json:"max_tokens,omitempty"`
+	Model            string             `json:"model"`
+	Pricing          *struct {
+		InputPer1m  *float64 `json:"input_per_1m,omitempty"`
+		OutputPer1m *float64 `json:"output_per_1m,omitempty"`
+	} `json:"pricing,omitempty"`
+	Stream       *bool    `json:"stream,omitempty"`
+	SystemPrompt *string  `json:"system_prompt,omitempty"`
+	Temperature  *float64 `json:"temperature,omitempty"`
+	TimeoutMs    *int     `json:"timeout_ms,omitempty"`
 
-	// PromptTemplate User message template (default: {{ .input.input }} or the JSON of input)
-	PromptTemplate       *string                `json:"prompt_template,omitempty"`
-	SystemPrompt         *string                `json:"system_prompt,omitempty"`
-	Temperature          *float64               `json:"temperature,omitempty"`
-	Tools                *[]JSONObject          `json:"tools,omitempty"`
-	TopP                 *float64               `json:"top_p,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	// Tls PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
+	Tls *TLSConfig `json:"tls,omitempty"`
+
+	// ToolChoice Any JSON value
+	ToolChoice *JSONValue    `json:"tool_choice,omitempty"`
+	Tools      *[]JSONObject `json:"tools,omitempty"`
+
+	// UserTemplate User message template (default: the lone string in the input, else its JSON)
+	UserTemplate *string `json:"user_template,omitempty"`
 }
 
 // ApiKey defines model for ApiKey.
@@ -1031,23 +1062,31 @@ type BaselinePolicyPolicy string
 
 // BedrockTargetConfig defines model for BedrockTargetConfig.
 type BedrockTargetConfig struct {
-	AccessKeyIdSecret *string     `json:"access_key_id_secret,omitempty"`
-	ExtraBody         *JSONObject `json:"extra_body,omitempty"`
-	JsonMode          *bool       `json:"json_mode,omitempty"`
-	MaxTokens         *int        `json:"max_tokens,omitempty"`
-	Model             *string     `json:"model,omitempty"`
-	ModelId           *string     `json:"model_id,omitempty"`
+	AccessKeyId                  string      `json:"access_key_id"`
+	AdditionalModelRequestFields *JSONObject `json:"additional_model_request_fields,omitempty"`
+	Endpoint                     *string     `json:"endpoint,omitempty"`
+	ExtraBody                    *JSONObject `json:"extra_body,omitempty"`
+	MaxConcurrency               *int        `json:"max_concurrency,omitempty"`
+	MaxResponseBytes             *int64      `json:"max_response_bytes,omitempty"`
+	MaxTokens                    *int        `json:"max_tokens,omitempty"`
+	Model                        string      `json:"model"`
+	Pricing                      *struct {
+		InputPer1m  *float64 `json:"input_per_1m,omitempty"`
+		OutputPer1m *float64 `json:"output_per_1m,omitempty"`
+	} `json:"pricing,omitempty"`
+	Region          string   `json:"region"`
+	SecretAccessKey string   `json:"secret_access_key"`
+	SessionToken    *string  `json:"session_token,omitempty"`
+	SystemPrompt    *string  `json:"system_prompt,omitempty"`
+	Temperature     *float64 `json:"temperature,omitempty"`
+	TimeoutMs       *int     `json:"timeout_ms,omitempty"`
 
-	// PromptTemplate User message template (default: {{ .input.input }} or the JSON of input)
-	PromptTemplate        *string                `json:"prompt_template,omitempty"`
-	Region                *string                `json:"region,omitempty"`
-	SecretAccessKeySecret *string                `json:"secret_access_key_secret,omitempty"`
-	SessionTokenSecret    *string                `json:"session_token_secret,omitempty"`
-	SystemPrompt          *string                `json:"system_prompt,omitempty"`
-	Temperature           *float64               `json:"temperature,omitempty"`
-	Tools                 *[]JSONObject          `json:"tools,omitempty"`
-	TopP                  *float64               `json:"top_p,omitempty"`
-	AdditionalProperties  map[string]interface{} `json:"-"`
+	// Tls PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
+	Tls        *TLSConfig  `json:"tls,omitempty"`
+	ToolConfig *JSONObject `json:"tool_config,omitempty"`
+
+	// UserTemplate User message template (default: the lone string in the input, else its JSON)
+	UserTemplate *string `json:"user_template,omitempty"`
 }
 
 // CachePolicy defines model for CachePolicy.
@@ -1057,19 +1096,24 @@ type CachePolicy struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
-// ColumnMapping Maps source columns to example fields. Unmapped columns go to metadata when `rest_to_metadata`.
+// ColumnMapping Maps source columns to example fields (the importer's mapping, verbatim).
 type ColumnMapping struct {
-	Context      *string `json:"context,omitempty"`
-	Conversation *string `json:"conversation,omitempty"`
-	Expected     *string `json:"expected,omitempty"`
+	ContextColumn    *string `json:"context_column,omitempty"`
+	ContextDelimiter *string `json:"context_delimiter,omitempty"`
 
-	// Input Columns that become input fields (name preserved)
-	Input          *[]string `json:"input,omitempty"`
-	Metadata       *[]string `json:"metadata,omitempty"`
-	RestToMetadata *bool     `json:"rest_to_metadata,omitempty"`
+	// ConversationColumn OpenAI-style messages array
+	ConversationColumn *string `json:"conversation_column,omitempty"`
+	ExpectedColumn     *string `json:"expected_column,omitempty"`
+	IdColumn           *string `json:"id_column,omitempty"`
 
-	// Tags Column with comma-separated tags
-	Tags *string `json:"tags,omitempty"`
+	// InputColumns source column -> input key
+	InputColumns    *map[string]string `json:"input_columns,omitempty"`
+	MetadataColumns *[]string          `json:"metadata_columns,omitempty"`
+	TagsColumn      *string            `json:"tags_column,omitempty"`
+	TagsDelimiter   *string            `json:"tags_delimiter,omitempty"`
+
+	// WholeRowAsInput Put every column not mapped elsewhere into input
+	WholeRowAsInput *bool `json:"whole_row_as_input,omitempty"`
 }
 
 // Comparison defines model for Comparison.
@@ -1096,21 +1140,44 @@ type ComparisonList struct {
 
 // ComparisonReport defines model for ComparisonReport.
 type ComparisonReport struct {
-	EvaluatorId  *openapi_types.UUID `json:"evaluator_id,omitempty"`
-	Improvements []ExampleDelta      `json:"improvements"`
-	Pairwise     *struct {
-		Losses *int `json:"losses,omitempty"`
-		Ties   *int `json:"ties,omitempty"`
-		Wins   *int `json:"wins,omitempty"`
-	} `json:"pairwise,omitempty"`
-	Regressions []ExampleDelta `json:"regressions"`
-	Runs        []Run          `json:"runs"`
-	Scatter     *[]struct {
+	AgainstRunId *openapi_types.UUID `json:"against_run_id,omitempty"`
+
+	// EvaluatorId Evaluator used for regressions
+	EvaluatorId *openapi_types.UUID `json:"evaluator_id,omitempty"`
+
+	// Evaluators Evaluators present in the baseline and at least one other run
+	Evaluators *[]struct {
+		Id   openapi_types.UUID `json:"id"`
+		Name string             `json:"name"`
+	} `json:"evaluators,omitempty"`
+	Improvements      []ExampleDelta `json:"improvements"`
+	ImprovementsTotal *int           `json:"improvements_total,omitempty"`
+
+	// Pairwise Win rate of each pairwise-scored run
+	Pairwise         *[]PairwiseSummary `json:"pairwise,omitempty"`
+	Regressions      []ExampleDelta     `json:"regressions"`
+	RegressionsTotal *int               `json:"regressions_total,omitempty"`
+	Rows             *[]ComparisonRow   `json:"rows,omitempty"`
+	RowsTotal        *int               `json:"rows_total,omitempty"`
+	Runs             []Run              `json:"runs"`
+	Scatter          *[]struct {
 		A         float64            `json:"a"`
 		B         float64            `json:"b"`
 		ExampleId openapi_types.UUID `json:"example_id"`
 	} `json:"scatter,omitempty"`
 	Scorecard []ScorecardRow `json:"scorecard"`
+}
+
+// ComparisonRow defines model for ComparisonRow.
+type ComparisonRow struct {
+	// Cells One per compared run, same order as `runs`; absent value = example not scored in that run
+	Cells []struct {
+		Passed *bool              `json:"passed,omitempty"`
+		RunId  openapi_types.UUID `json:"run_id"`
+		Value  *float64           `json:"value,omitempty"`
+	} `json:"cells"`
+	ExampleId    openapi_types.UUID `json:"example_id"`
+	InputPreview *string            `json:"input_preview,omitempty"`
 }
 
 // Conversation Multi-turn script (turns) or simulated user (simulation); exactly one is set
@@ -1173,11 +1240,11 @@ type DatasetImportFormat string
 
 // DatasetImportRequest defines model for DatasetImportRequest.
 type DatasetImportRequest struct {
-	// Mapping Maps source columns to example fields. Unmapped columns go to metadata when `rest_to_metadata`.
+	// Mapping Maps source columns to example fields (the importer's mapping, verbatim).
 	Mapping *ColumnMapping            `json:"mapping,omitempty"`
 	Mode    *DatasetImportRequestMode `json:"mode,omitempty"`
 
-	// Preview Parse and return up to 20 mapped rows without writing
+	// Preview Same as the `preview` query parameter
 	Preview *bool `json:"preview,omitempty"`
 
 	// Publish Publish a version after importing
@@ -1192,8 +1259,9 @@ type DatasetImportRequest struct {
 		HfRepo  *string                         `json:"hf_repo,omitempty"`
 		HfSplit *string                         `json:"hf_split,omitempty"`
 		Kind    *DatasetImportRequestSourceKind `json:"kind,omitempty"`
-		Limit   *int                            `json:"limit,omitempty"`
-		Url     *string                         `json:"url,omitempty"`
+
+		// Limit Import at most this many rows
+		Limit *int `json:"limit,omitempty"`
 	} `json:"source,omitempty"`
 
 	// Tags Tags added to every imported example
@@ -1211,12 +1279,22 @@ type DatasetImportResult struct {
 	Columns *[]string `json:"columns,omitempty"`
 
 	// Count Examples written (0 for preview)
-	Count  int `json:"count"`
-	Errors *[]struct {
-		Message string `json:"message"`
-		Row     int    `json:"row"`
-	} `json:"errors,omitempty"`
-	Preview *[]ExampleData  `json:"preview,omitempty"`
+	Count           int               `json:"count"`
+	Errors          *[]ImportRowError `json:"errors,omitempty"`
+	ErrorsTruncated *bool             `json:"errors_truncated,omitempty"`
+
+	// Failed Rows skipped
+	Failed int `json:"failed"`
+
+	// Preview Mapped examples (preview with a mapping)
+	Preview       *[]ExampleData  `json:"preview,omitempty"`
+	SourcePreview *DatasetPreview `json:"source_preview,omitempty"`
+
+	// SuggestedMapping Maps source columns to example fields (the importer's mapping, verbatim).
+	SuggestedMapping *ColumnMapping `json:"suggested_mapping,omitempty"`
+
+	// Total Source rows read
+	Total   int             `json:"total"`
 	Version *DatasetVersion `json:"version,omitempty"`
 }
 
@@ -1224,6 +1302,25 @@ type DatasetImportResult struct {
 type DatasetList struct {
 	Items      []Dataset `json:"items"`
 	NextCursor *string   `json:"next_cursor,omitempty"`
+}
+
+// DatasetPreview defines model for DatasetPreview.
+type DatasetPreview struct {
+	Columns []struct {
+		// InferredType string|int|float|bool|array|object|messages|null
+		InferredType string      `json:"inferred_type"`
+		Name         string      `json:"name"`
+		SampleValues []JSONValue `json:"sample_values"`
+	} `json:"columns"`
+	Format    string            `json:"format"`
+	RowErrors *[]ImportRowError `json:"row_errors,omitempty"`
+
+	// Rows Aligned with columns
+	Rows [][]JSONValue `json:"rows"`
+
+	// TotalEstimate -1 when unknown
+	TotalEstimate int64 `json:"total_estimate"`
+	TotalExact    bool  `json:"total_exact"`
 }
 
 // DatasetSchema Optional column hints for the editor
@@ -1275,7 +1372,7 @@ type Error struct {
 type Evaluator struct {
 	Category EvaluatorCategory `json:"category"`
 
-	// Config Kind-specific options. Only the fields relevant to the kind are used.
+	// Config Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative.
 	Config      EvaluatorConfig    `json:"config"`
 	CreatedAt   time.Time          `json:"created_at"`
 	Description string             `json:"description"`
@@ -1290,24 +1387,49 @@ type Evaluator struct {
 
 // EvaluatorAgreement defines model for EvaluatorAgreement.
 type EvaluatorAgreement struct {
-	CohensKappa  *float64           `json:"cohens_kappa,omitempty"`
-	EvaluatorId  openapi_types.UUID `json:"evaluator_id"`
-	MeanAbsError *float64           `json:"mean_abs_error,omitempty"`
+	// CohensKappa Over pass/fail verdicts
+	CohensKappa *float64 `json:"cohens_kappa,omitempty"`
+
+	// Confusion Human verdict (rows) vs evaluator verdict (columns), pass = positive
+	Confusion *struct {
+		Fn *int `json:"fn,omitempty"`
+		Fp *int `json:"fp,omitempty"`
+		Tn *int `json:"tn,omitempty"`
+		Tp *int `json:"tp,omitempty"`
+	} `json:"confusion,omitempty"`
+	EvaluatorId   openapi_types.UUID `json:"evaluator_id"`
+	HumanPassRate *float64           `json:"human_pass_rate,omitempty"`
+	JudgePassRate *float64           `json:"judge_pass_rate,omitempty"`
+	MeanAbsError  *float64           `json:"mean_abs_error,omitempty"`
 
 	// N Results with both a score and a human annotation
-	N                int      `json:"n"`
+	N int `json:"n"`
+
+	// NBinary Pairs with a pass/fail verdict on both sides
+	NBinary *int `json:"n_binary,omitempty"`
+
+	// NNumeric Pairs with a numeric value on both sides
+	NNumeric *int `json:"n_numeric,omitempty"`
+
+	// Pearson Over numeric values
+	Pearson          *float64 `json:"pearson,omitempty"`
 	PercentAgreement *float64 `json:"percent_agreement,omitempty"`
+}
+
+// EvaluatorCatalog defines model for EvaluatorCatalog.
+type EvaluatorCatalog struct {
+	Items []EvaluatorKindInfo `json:"items"`
 }
 
 // EvaluatorCategory defines model for EvaluatorCategory.
 type EvaluatorCategory string
 
-// EvaluatorConfig Kind-specific options. Only the fields relevant to the kind are used.
+// EvaluatorConfig Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative.
 type EvaluatorConfig = json.RawMessage
 
 // EvaluatorCreate defines model for EvaluatorCreate.
 type EvaluatorCreate struct {
-	// Config Kind-specific options. Only the fields relevant to the kind are used.
+	// Config Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative.
 	Config      *EvaluatorConfig `json:"config,omitempty"`
 	Description *string          `json:"description,omitempty"`
 	Kind        EvaluatorKind    `json:"kind"`
@@ -1317,6 +1439,29 @@ type EvaluatorCreate struct {
 // EvaluatorKind defines model for EvaluatorKind.
 type EvaluatorKind string
 
+// EvaluatorKindInfo defines model for EvaluatorKindInfo.
+type EvaluatorKindInfo struct {
+	ApplyTo      []ApplyTo                 `json:"apply_to"`
+	Category     EvaluatorKindInfoCategory `json:"category"`
+	ConfigSchema JSONObject                `json:"config_schema"`
+
+	// Cost free | cheap | moderate | expensive
+	Cost             string  `json:"cost"`
+	DefaultThreshold float64 `json:"default_threshold"`
+	Description      string  `json:"description"`
+	Group            string  `json:"group"`
+	Kind             string  `json:"kind"`
+	Name             string  `json:"name"`
+
+	// Prompt Judge prompt template shown to users
+	Prompt        *string   `json:"prompt,omitempty"`
+	PromptVersion *string   `json:"prompt_version,omitempty"`
+	Requires      *[]string `json:"requires,omitempty"`
+}
+
+// EvaluatorKindInfoCategory defines model for EvaluatorKindInfo.Category.
+type EvaluatorKindInfoCategory string
+
 // EvaluatorList defines model for EvaluatorList.
 type EvaluatorList struct {
 	Items      []Evaluator `json:"items"`
@@ -1325,7 +1470,7 @@ type EvaluatorList struct {
 
 // EvaluatorPreviewRequest defines model for EvaluatorPreviewRequest.
 type EvaluatorPreviewRequest struct {
-	// Config Kind-specific options. Only the fields relevant to the kind are used.
+	// Config Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative.
 	Config  *EvaluatorConfig `json:"config,omitempty"`
 	Example *ExampleData     `json:"example,omitempty"`
 	Kind    EvaluatorKind    `json:"kind"`
@@ -1339,7 +1484,7 @@ type EvaluatorPreviewRequest struct {
 
 // EvaluatorUpdate defines model for EvaluatorUpdate.
 type EvaluatorUpdate struct {
-	// Config Kind-specific options. Only the fields relevant to the kind are used.
+	// Config Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative.
 	Config      *EvaluatorConfig `json:"config,omitempty"`
 	Description *string          `json:"description,omitempty"`
 	Kind        *EvaluatorKind   `json:"kind,omitempty"`
@@ -1382,15 +1527,13 @@ type ExampleData struct {
 
 // ExampleDelta defines model for ExampleDelta.
 type ExampleDelta struct {
-	Cells []ExampleDeltaCell `json:"cells"`
-
-	// Delta Last run's score minus the first run's
-	Delta     float64            `json:"delta"`
-	ExampleId openapi_types.UUID `json:"example_id"`
-
-	// Expected Any JSON value
-	Expected *JSONValue  `json:"expected,omitempty"`
-	Input    *JSONObject `json:"input,omitempty"`
+	Baseline        float64            `json:"baseline"`
+	BaselinePassed  *bool              `json:"baseline_passed,omitempty"`
+	Candidate       float64            `json:"candidate"`
+	CandidatePassed *bool              `json:"candidate_passed,omitempty"`
+	Delta           float64            `json:"delta"`
+	ExampleId       openapi_types.UUID `json:"example_id"`
+	InputPreview    *string            `json:"input_preview,omitempty"`
 }
 
 // ExampleDeltaCell defines model for ExampleDeltaCell.
@@ -1433,10 +1576,13 @@ type Gate struct {
 	CreatedAt time.Time `json:"created_at"`
 	Enabled   bool      `json:"enabled"`
 
-	// Expr Gate expression AST. Logical nodes (`and`, `or`, `not`) have `args`; `compare` nodes compute
-	// `fn(metric[, evaluator][, selector][, tag]) comparator value`. Examples:
-	// mean(faithfulness) >= 0.85 → {op:compare, fn:mean, metric:evaluator, evaluator_id, comparator:">=", value:0.85};
-	// count(critical_fail) == 0 → {op:compare, fn:count, metric:results, selector:critical_fail, comparator:"==", value:0}.
+	// Expr Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+	// `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+	// `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+	// evaluator name or slug and the server rewrites it. Example for
+	// `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+	// {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+	// {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
 	Expr    GateExpr           `json:"expr"`
 	Id      openapi_types.UUID `json:"id"`
 	Name    string             `json:"name"`
@@ -1447,22 +1593,29 @@ type Gate struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// GateCreate defines model for GateCreate.
+// GateCreate Send `text` (e.g. `mean(faithfulness) >= 0.85`) or `expr` (the AST); exactly one.
 type GateCreate struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Expr Gate expression AST. Logical nodes (`and`, `or`, `not`) have `args`; `compare` nodes compute
-	// `fn(metric[, evaluator][, selector][, tag]) comparator value`. Examples:
-	// mean(faithfulness) >= 0.85 → {op:compare, fn:mean, metric:evaluator, evaluator_id, comparator:">=", value:0.85};
-	// count(critical_fail) == 0 → {op:compare, fn:count, metric:results, selector:critical_fail, comparator:"==", value:0}.
-	Expr GateExpr `json:"expr"`
-	Name *string  `json:"name,omitempty"`
+	// Expr Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+	// `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+	// `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+	// evaluator name or slug and the server rewrites it. Example for
+	// `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+	// {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+	// {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
+	Expr *GateExpr `json:"expr,omitempty"`
+	Name *string   `json:"name,omitempty"`
+	Text *string   `json:"text,omitempty"`
 }
 
-// GateExpr Gate expression AST. Logical nodes (`and`, `or`, `not`) have `args`; `compare` nodes compute
-// `fn(metric[, evaluator][, selector][, tag]) comparator value`. Examples:
-// mean(faithfulness) >= 0.85 → {op:compare, fn:mean, metric:evaluator, evaluator_id, comparator:">=", value:0.85};
-// count(critical_fail) == 0 → {op:compare, fn:count, metric:results, selector:critical_fail, comparator:"==", value:0}.
+// GateExpr Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+// `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+// `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+// evaluator name or slug and the server rewrites it. Example for
+// `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+// {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+// {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
 type GateExpr = json.RawMessage
 
 // GateList defines model for GateList.
@@ -1484,12 +1637,54 @@ type GateResult struct {
 type GateUpdate struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Expr Gate expression AST. Logical nodes (`and`, `or`, `not`) have `args`; `compare` nodes compute
-	// `fn(metric[, evaluator][, selector][, tag]) comparator value`. Examples:
-	// mean(faithfulness) >= 0.85 → {op:compare, fn:mean, metric:evaluator, evaluator_id, comparator:">=", value:0.85};
-	// count(critical_fail) == 0 → {op:compare, fn:count, metric:results, selector:critical_fail, comparator:"==", value:0}.
+	// Expr Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+	// `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+	// `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+	// evaluator name or slug and the server rewrites it. Example for
+	// `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+	// {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+	// {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
 	Expr *GateExpr `json:"expr,omitempty"`
 	Name *string   `json:"name,omitempty"`
+	Text *string   `json:"text,omitempty"`
+}
+
+// GateValidateRequest defines model for GateValidateRequest.
+type GateValidateRequest struct {
+	// Expr Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+	// `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+	// `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+	// evaluator name or slug and the server rewrites it. Example for
+	// `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+	// {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+	// {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
+	Expr *GateExpr `json:"expr,omitempty"`
+	Text *string   `json:"text,omitempty"`
+}
+
+// GateValidateResult defines model for GateValidateResult.
+type GateValidateResult struct {
+	Error *string `json:"error,omitempty"`
+
+	// Evaluators Evaluator names the expression references
+	Evaluators *[]string `json:"evaluators,omitempty"`
+
+	// Expr Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+	// `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+	// `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+	// evaluator name or slug and the server rewrites it. Example for
+	// `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+	// {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+	// {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
+	Expr *GateExpr `json:"expr,omitempty"`
+	Ok   bool      `json:"ok"`
+
+	// Position Character offset of a text parse error (0-based)
+	Position   *int    `json:"position,omitempty"`
+	Suggestion *string `json:"suggestion,omitempty"`
+
+	// Text Canonical rendering
+	Text *string `json:"text,omitempty"`
 }
 
 // Health defines model for Health.
@@ -1510,30 +1705,48 @@ type Histogram struct {
 // HttpTargetConfig defines model for HttpTargetConfig.
 type HttpTargetConfig struct {
 	// Body Request body template (usually JSON)
-	Body    *string                 `json:"body,omitempty"`
-	Headers *map[string]string      `json:"headers,omitempty"`
-	Method  *HttpTargetConfigMethod `json:"method,omitempty"`
-	Query   *map[string]string      `json:"query,omitempty"`
+	Body *string `json:"body,omitempty"`
+
+	// ExpectStatus Accepted status codes (default any 2xx)
+	ExpectStatus     *[]int                  `json:"expect_status,omitempty"`
+	Headers          *map[string]string      `json:"headers,omitempty"`
+	MaxConcurrency   *int                    `json:"max_concurrency,omitempty"`
+	MaxResponseBytes *int64                  `json:"max_response_bytes,omitempty"`
+	Method           *HttpTargetConfigMethod `json:"method,omitempty"`
 
 	// Response JSONPath expressions applied to the response body
-	Response             *ResponseMapping           `json:"response,omitempty"`
-	Retries              *int                       `json:"retries,omitempty"`
-	Streaming            *HttpTargetConfigStreaming `json:"streaming,omitempty"`
-	TimeoutMs            *int                       `json:"timeout_ms,omitempty"`
-	Tls                  *TLSConfig                 `json:"tls,omitempty"`
-	Url                  string                     `json:"url"`
-	AdditionalProperties map[string]interface{}     `json:"-"`
+	Response *ResponseMapping `json:"response,omitempty"`
+	Session  *struct {
+		Path string `json:"path"`
+	} `json:"session,omitempty"`
+	Stream *struct {
+		DeltaPath    string                     `json:"delta_path"`
+		DoneSentinel *string                    `json:"done_sentinel,omitempty"`
+		Event        *string                    `json:"event,omitempty"`
+		Mode         HttpTargetConfigStreamMode `json:"mode"`
+	} `json:"stream,omitempty"`
+	TimeoutMs *int `json:"timeout_ms,omitempty"`
+
+	// Tls PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
+	Tls *TLSConfig `json:"tls,omitempty"`
+	Url string     `json:"url"`
 }
 
 // HttpTargetConfigMethod defines model for HttpTargetConfig.Method.
 type HttpTargetConfigMethod string
 
-// HttpTargetConfigStreaming defines model for HttpTargetConfig.Streaming.
-type HttpTargetConfigStreaming string
+// HttpTargetConfigStreamMode defines model for HttpTargetConfig.Stream.Mode.
+type HttpTargetConfigStreamMode string
 
 // IDList defines model for IDList.
 type IDList struct {
 	Ids []openapi_types.UUID `json:"ids"`
+}
+
+// ImportRowError defines model for ImportRowError.
+type ImportRowError struct {
+	Message string `json:"message"`
+	Row     int    `json:"row"`
 }
 
 // JSONObject defines model for JSONObject.
@@ -1568,18 +1781,23 @@ type JudgeModelConfigProvider string
 
 // LLMSamplingConfig defines model for LLMSamplingConfig.
 type LLMSamplingConfig struct {
-	ExtraBody *JSONObject `json:"extra_body,omitempty"`
-	JsonMode  *bool       `json:"json_mode,omitempty"`
-	MaxTokens *int        `json:"max_tokens,omitempty"`
-	Model     *string     `json:"model,omitempty"`
+	MaxConcurrency   *int   `json:"max_concurrency,omitempty"`
+	MaxResponseBytes *int64 `json:"max_response_bytes,omitempty"`
+	MaxTokens        *int   `json:"max_tokens,omitempty"`
+	Model            string `json:"model"`
+	Pricing          *struct {
+		InputPer1m  *float64 `json:"input_per_1m,omitempty"`
+		OutputPer1m *float64 `json:"output_per_1m,omitempty"`
+	} `json:"pricing,omitempty"`
+	SystemPrompt *string  `json:"system_prompt,omitempty"`
+	Temperature  *float64 `json:"temperature,omitempty"`
+	TimeoutMs    *int     `json:"timeout_ms,omitempty"`
 
-	// PromptTemplate User message template (default: {{ .input.input }} or the JSON of input)
-	PromptTemplate       *string                `json:"prompt_template,omitempty"`
-	SystemPrompt         *string                `json:"system_prompt,omitempty"`
-	Temperature          *float64               `json:"temperature,omitempty"`
-	Tools                *[]JSONObject          `json:"tools,omitempty"`
-	TopP                 *float64               `json:"top_p,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	// Tls PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
+	Tls *TLSConfig `json:"tls,omitempty"`
+
+	// UserTemplate User message template (default: the lone string in the input, else its JSON)
+	UserTemplate *string `json:"user_template,omitempty"`
 }
 
 // Labels Free-form string labels such as git_sha, branch, pr
@@ -1709,27 +1927,38 @@ type NotificationEvent string
 
 // OpenAITargetConfig defines model for OpenAITargetConfig.
 type OpenAITargetConfig struct {
-	ApiKeySecret *string `json:"api_key_secret,omitempty"`
+	// ApiKey Template, e.g. {{ secret "OPENAI_KEY" }}
+	ApiKey           *string            `json:"api_key,omitempty"`
+	AuthHeader       *string            `json:"auth_header,omitempty"`
+	BaseUrl          *string            `json:"base_url,omitempty"`
+	ExtraBody        *JSONObject        `json:"extra_body,omitempty"`
+	Headers          *map[string]string `json:"headers,omitempty"`
+	MaxConcurrency   *int               `json:"max_concurrency,omitempty"`
+	MaxResponseBytes *int64             `json:"max_response_bytes,omitempty"`
+	MaxTokens        *int               `json:"max_tokens,omitempty"`
+	MaxTokensParam   *string            `json:"max_tokens_param,omitempty"`
+	Model            string             `json:"model"`
+	Path             *string            `json:"path,omitempty"`
+	Pricing          *struct {
+		InputPer1m  *float64 `json:"input_per_1m,omitempty"`
+		OutputPer1m *float64 `json:"output_per_1m,omitempty"`
+	} `json:"pricing,omitempty"`
+	Query          *map[string]string `json:"query,omitempty"`
+	ResponseFormat *JSONObject        `json:"response_format,omitempty"`
+	Stream         *bool              `json:"stream,omitempty"`
+	SystemPrompt   *string            `json:"system_prompt,omitempty"`
+	Temperature    *float64           `json:"temperature,omitempty"`
+	TimeoutMs      *int               `json:"timeout_ms,omitempty"`
 
-	// ApiVersion Azure OpenAI api-version
-	ApiVersion *string `json:"api_version,omitempty"`
-	BaseUrl    *string `json:"base_url,omitempty"`
+	// Tls PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
+	Tls *TLSConfig `json:"tls,omitempty"`
 
-	// Deployment Azure OpenAI deployment
-	Deployment   *string     `json:"deployment,omitempty"`
-	ExtraBody    *JSONObject `json:"extra_body,omitempty"`
-	JsonMode     *bool       `json:"json_mode,omitempty"`
-	MaxTokens    *int        `json:"max_tokens,omitempty"`
-	Model        *string     `json:"model,omitempty"`
-	Organization *string     `json:"organization,omitempty"`
+	// ToolChoice Any JSON value
+	ToolChoice *JSONValue    `json:"tool_choice,omitempty"`
+	Tools      *[]JSONObject `json:"tools,omitempty"`
 
-	// PromptTemplate User message template (default: {{ .input.input }} or the JSON of input)
-	PromptTemplate       *string                `json:"prompt_template,omitempty"`
-	SystemPrompt         *string                `json:"system_prompt,omitempty"`
-	Temperature          *float64               `json:"temperature,omitempty"`
-	Tools                *[]JSONObject          `json:"tools,omitempty"`
-	TopP                 *float64               `json:"top_p,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	// UserTemplate User message template (default: the lone string in the input, else its JSON)
+	UserTemplate *string `json:"user_template,omitempty"`
 }
 
 // Organization defines model for Organization.
@@ -1758,6 +1987,17 @@ type OrganizationList struct {
 type OrganizationUpdate struct {
 	Name *string `json:"name,omitempty"`
 	Slug *string `json:"slug,omitempty"`
+}
+
+// PairwiseSummary defines model for PairwiseSummary.
+type PairwiseSummary struct {
+	Losses int                `json:"losses"`
+	RunId  openapi_types.UUID `json:"run_id"`
+	Ties   int                `json:"ties"`
+
+	// WinRate (wins + ties/2) / decided
+	WinRate float64 `json:"win_rate"`
+	Wins    int     `json:"wins"`
 }
 
 // Project defines model for Project.
@@ -1794,6 +2034,35 @@ type ProjectList struct {
 	NextCursor *string   `json:"next_cursor,omitempty"`
 }
 
+// ProjectOverview defines model for ProjectOverview.
+type ProjectOverview struct {
+	// AvgScore Mean of the latest finished run's evaluator means
+	AvgScore *float64 `json:"avg_score,omitempty"`
+
+	// FailingGates Suites whose latest finished run failed its gate
+	FailingGates  int `json:"failing_gates"`
+	FailingSuites *[]struct {
+		Name    *string            `json:"name,omitempty"`
+		RunId   openapi_types.UUID `json:"run_id"`
+		SuiteId openapi_types.UUID `json:"suite_id"`
+	} `json:"failing_suites,omitempty"`
+
+	// LatestPassRate Pass rate of the latest finished run (0..1)
+	LatestPassRate *float64 `json:"latest_pass_rate,omitempty"`
+	LatestRun      *Run     `json:"latest_run,omitempty"`
+
+	// PassRateDelta Change vs the previous finished run of the same suite
+	PassRateDelta *float64 `json:"pass_rate_delta,omitempty"`
+
+	// Runs7d Runs created in the last 7 days
+	Runs7d int `json:"runs_7d"`
+
+	// RunsPrev7d Runs created in the 7 days before that
+	RunsPrev7d     int      `json:"runs_prev_7d"`
+	Spend7dUsd     float64  `json:"spend_7d_usd"`
+	SpendPrev7dUsd *float64 `json:"spend_prev_7d_usd,omitempty"`
+}
+
 // ProjectSettings defines model for ProjectSettings.
 type ProjectSettings struct {
 	DefaultTargetId *openapi_types.UUID `json:"default_target_id,omitempty"`
@@ -1826,25 +2095,29 @@ type RescoreRequest struct {
 // ResponseMapping JSONPath expressions applied to the response body
 type ResponseMapping struct {
 	// Context Path to an array of retrieved passages
-	Context *string `json:"context,omitempty"`
-	CostUsd *string `json:"cost_usd,omitempty"`
+	Context     *string `json:"context,omitempty"`
+	CostUsd     *string `json:"cost_usd,omitempty"`
+	InputTokens *string `json:"input_tokens,omitempty"`
 
 	// Output Example: $.choices[0].message.content
-	Output     *string `json:"output,omitempty"`
-	OutputJson *string `json:"output_json,omitempty"`
-
-	// SessionId Multi-turn session id to feed back
-	SessionId *string `json:"session_id,omitempty"`
-
-	// StreamDelta Path of the text delta inside each SSE/NDJSON chunk
-	StreamDelta *string `json:"stream_delta,omitempty"`
-	ToolCalls   *string `json:"tool_calls,omitempty"`
-
-	// Trace agent: path to intermediate steps
-	Trace                *string                `json:"trace,omitempty"`
-	UsageInputTokens     *string                `json:"usage_input_tokens,omitempty"`
-	UsageOutputTokens    *string                `json:"usage_output_tokens,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	Output       *string `json:"output,omitempty"`
+	OutputJson   *string `json:"output_json,omitempty"`
+	OutputTokens *string `json:"output_tokens,omitempty"`
+	ToolCalls    *struct {
+		Arguments *string `json:"arguments,omitempty"`
+		Id        *string `json:"id,omitempty"`
+		Name      *string `json:"name,omitempty"`
+		Path      string  `json:"path"`
+		Result    *string `json:"result,omitempty"`
+	} `json:"tool_calls,omitempty"`
+	Trace *struct {
+		DurationMs *string `json:"duration_ms,omitempty"`
+		Input      *string `json:"input,omitempty"`
+		Kind       *string `json:"kind,omitempty"`
+		Name       *string `json:"name,omitempty"`
+		Output     *string `json:"output,omitempty"`
+		Path       string  `json:"path"`
+	} `json:"trace,omitempty"`
 }
 
 // Result defines model for Result.
@@ -2133,13 +2406,25 @@ type Score struct {
 
 // ScorecardCell defines model for ScorecardCell.
 type ScorecardCell struct {
+	CiHigh *float64 `json:"ci_high,omitempty"`
+
+	// CiLow Paired bootstrap interval of the mean delta
+	CiLow *float64 `json:"ci_low,omitempty"`
+
 	// DeltaMean vs the first run
-	DeltaMean     *float64           `json:"delta_mean,omitempty"`
-	DeltaPassRate *float64           `json:"delta_pass_rate,omitempty"`
-	Mean          *float64           `json:"mean,omitempty"`
-	N             int                `json:"n"`
-	PassRate      *float64           `json:"pass_rate,omitempty"`
-	RunId         openapi_types.UUID `json:"run_id"`
+	DeltaMean     *float64 `json:"delta_mean,omitempty"`
+	DeltaPassRate *float64 `json:"delta_pass_rate,omitempty"`
+	Mean          *float64 `json:"mean,omitempty"`
+	N             int      `json:"n"`
+	PValue        *float64 `json:"p_value,omitempty"`
+
+	// Paired Examples scored in both this run and the baseline
+	Paired   *int               `json:"paired,omitempty"`
+	PassRate *float64           `json:"pass_rate,omitempty"`
+	RunId    openapi_types.UUID `json:"run_id"`
+
+	// Significant The interval excludes zero
+	Significant *bool `json:"significant,omitempty"`
 }
 
 // ScorecardRow defines model for ScorecardRow.
@@ -2276,13 +2561,13 @@ type SuiteUpdate struct {
 	Slug          *string             `json:"slug,omitempty"`
 }
 
-// TLSConfig defines model for TLSConfig.
+// TLSConfig PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
 type TLSConfig struct {
-	CaCertSecret         *string                `json:"ca_cert_secret,omitempty"`
-	ClientCertSecret     *string                `json:"client_cert_secret,omitempty"`
-	ClientKeySecret      *string                `json:"client_key_secret,omitempty"`
-	InsecureSkipVerify   *bool                  `json:"insecure_skip_verify,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	CaCert             *string `json:"ca_cert,omitempty"`
+	ClientCert         *string `json:"client_cert,omitempty"`
+	ClientKey          *string `json:"client_key,omitempty"`
+	InsecureSkipVerify *bool   `json:"insecure_skip_verify,omitempty"`
+	ServerName         *string `json:"server_name,omitempty"`
 }
 
 // Target defines model for Target.
@@ -2298,14 +2583,20 @@ type Target struct {
 	UpdatedAt      time.Time          `json:"updated_at"`
 }
 
-// TargetConfig Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
-// Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
+// TargetConfig Versioned target configuration, flat and specific to `kind` (see HttpTargetConfig, OpenAITargetConfig,
+// AnthropicTargetConfig, BedrockTargetConfig, VertexTargetConfig; `agent` takes the HttpTargetConfig fields and needs
+// a `response.trace` or `response.tool_calls` mapping). The server validates it strictly on create/update
+// (unknown fields are rejected) and returns 400 `validation_failed` with `details.field`.
+// Strings are Go templates: `{{ .input.question }}`, `{{ secret "KEY" }}`. Secret values never appear in test output.
 type TargetConfig = json.RawMessage
 
 // TargetCreate defines model for TargetCreate.
 type TargetCreate struct {
-	// Config Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
-	// Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
+	// Config Versioned target configuration, flat and specific to `kind` (see HttpTargetConfig, OpenAITargetConfig,
+	// AnthropicTargetConfig, BedrockTargetConfig, VertexTargetConfig; `agent` takes the HttpTargetConfig fields and needs
+	// a `response.trace` or `response.tool_calls` mapping). The server validates it strictly on create/update
+	// (unknown fields are rejected) and returns 400 `validation_failed` with `details.field`.
+	// Strings are Go templates: `{{ .input.question }}`, `{{ secret "KEY" }}`. Secret values never appear in test output.
 	Config      TargetConfig `json:"config"`
 	Description *string      `json:"description,omitempty"`
 	Kind        TargetKind   `json:"kind"`
@@ -2314,12 +2605,16 @@ type TargetCreate struct {
 
 // TargetDraftTestRequest defines model for TargetDraftTestRequest.
 type TargetDraftTestRequest struct {
-	// Config Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
-	// Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
-	Config    TargetConfig       `json:"config"`
-	Example   *ExampleData       `json:"example,omitempty"`
-	Kind      TargetKind         `json:"kind"`
-	Variables *map[string]string `json:"variables,omitempty"`
+	// Config Versioned target configuration, flat and specific to `kind` (see HttpTargetConfig, OpenAITargetConfig,
+	// AnthropicTargetConfig, BedrockTargetConfig, VertexTargetConfig; `agent` takes the HttpTargetConfig fields and needs
+	// a `response.trace` or `response.tool_calls` mapping). The server validates it strictly on create/update
+	// (unknown fields are rejected) and returns 400 `validation_failed` with `details.field`.
+	// Strings are Go templates: `{{ .input.question }}`, `{{ secret "KEY" }}`. Secret values never appear in test output.
+	Config    TargetConfig        `json:"config"`
+	DatasetId *openapi_types.UUID `json:"dataset_id,omitempty"`
+	Example   *ExampleData        `json:"example,omitempty"`
+	Kind      TargetKind          `json:"kind"`
+	Variables *map[string]string  `json:"variables,omitempty"`
 }
 
 // TargetKind defines model for TargetKind.
@@ -2364,14 +2659,30 @@ type TargetResponse struct {
 
 // TargetTestRequest defines model for TargetTestRequest.
 type TargetTestRequest struct {
-	Example   *ExampleData       `json:"example,omitempty"`
-	Variables *map[string]string `json:"variables,omitempty"`
+	// DatasetId Use the first example of this dataset (draft) as the sample
+	DatasetId *openapi_types.UUID `json:"dataset_id,omitempty"`
+	Example   *ExampleData        `json:"example,omitempty"`
+	Variables *map[string]string  `json:"variables,omitempty"`
 }
 
 // TargetTestResult defines model for TargetTestResult.
 type TargetTestResult struct {
 	Error *string `json:"error,omitempty"`
-	Ok    bool    `json:"ok"`
+
+	// ErrorClass permanent | transient | rate_limited | ... (empty when ok)
+	ErrorClass *string `json:"error_class,omitempty"`
+	LatencyMs  float64 `json:"latency_ms"`
+
+	// Mapping One row per configured response JSONPath, showing whether it matched
+	Mapping *[]struct {
+		Field   string `json:"field"`
+		Matched bool   `json:"matched"`
+		Path    string `json:"path"`
+
+		// Value Any JSON value
+		Value *JSONValue `json:"value,omitempty"`
+	} `json:"mapping,omitempty"`
+	Ok bool `json:"ok"`
 
 	// RawResponse Any JSON value
 	RawResponse *JSONValue `json:"raw_response,omitempty"`
@@ -2380,14 +2691,18 @@ type TargetTestResult struct {
 	Request *JSONValue `json:"request,omitempty"`
 
 	// Response What a target returned for one example (mirrors the execution pipeline's Response)
-	Response   *TargetResponse `json:"response,omitempty"`
-	StatusCode *int            `json:"status_code,omitempty"`
+	Response     *TargetResponse `json:"response,omitempty"`
+	RetryAfterMs *int64          `json:"retry_after_ms,omitempty"`
+	StatusCode   *int            `json:"status_code,omitempty"`
 }
 
 // TargetUpdate defines model for TargetUpdate.
 type TargetUpdate struct {
-	// Config Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
-	// Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
+	// Config Versioned target configuration, flat and specific to `kind` (see HttpTargetConfig, OpenAITargetConfig,
+	// AnthropicTargetConfig, BedrockTargetConfig, VertexTargetConfig; `agent` takes the HttpTargetConfig fields and needs
+	// a `response.trace` or `response.tool_calls` mapping). The server validates it strictly on create/update
+	// (unknown fields are rejected) and returns 400 `validation_failed` with `details.field`.
+	// Strings are Go templates: `{{ .input.question }}`, `{{ secret "KEY" }}`. Secret values never appear in test output.
 	Config      *TargetConfig `json:"config,omitempty"`
 	Description *string       `json:"description,omitempty"`
 	Name        *string       `json:"name,omitempty"`
@@ -2395,8 +2710,11 @@ type TargetUpdate struct {
 
 // TargetVersion defines model for TargetVersion.
 type TargetVersion struct {
-	// Config Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
-	// Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
+	// Config Versioned target configuration, flat and specific to `kind` (see HttpTargetConfig, OpenAITargetConfig,
+	// AnthropicTargetConfig, BedrockTargetConfig, VertexTargetConfig; `agent` takes the HttpTargetConfig fields and needs
+	// a `response.trace` or `response.tool_calls` mapping). The server validates it strictly on create/update
+	// (unknown fields are rejected) and returns 400 `validation_failed` with `details.field`.
+	// Strings are Go templates: `{{ .input.question }}`, `{{ secret "KEY" }}`. Secret values never appear in test output.
 	Config    TargetConfig        `json:"config"`
 	CreatedAt time.Time           `json:"created_at"`
 	CreatedBy *openapi_types.UUID `json:"created_by,omitempty"`
@@ -2565,22 +2883,32 @@ type User struct {
 
 // VertexTargetConfig defines model for VertexTargetConfig.
 type VertexTargetConfig struct {
-	// CredentialsSecret Service account JSON
-	CredentialsSecret *string     `json:"credentials_secret,omitempty"`
-	ExtraBody         *JSONObject `json:"extra_body,omitempty"`
-	JsonMode          *bool       `json:"json_mode,omitempty"`
-	Location          *string     `json:"location,omitempty"`
-	MaxTokens         *int        `json:"max_tokens,omitempty"`
-	Model             *string     `json:"model,omitempty"`
-	Project           *string     `json:"project,omitempty"`
+	AccessToken      *string     `json:"access_token,omitempty"`
+	ApiKey           *string     `json:"api_key,omitempty"`
+	BaseUrl          *string     `json:"base_url,omitempty"`
+	ExtraBody        *JSONObject `json:"extra_body,omitempty"`
+	Location         *string     `json:"location,omitempty"`
+	MaxConcurrency   *int        `json:"max_concurrency,omitempty"`
+	MaxResponseBytes *int64      `json:"max_response_bytes,omitempty"`
+	MaxTokens        *int        `json:"max_tokens,omitempty"`
+	Model            string      `json:"model"`
+	Pricing          *struct {
+		InputPer1m  *float64 `json:"input_per_1m,omitempty"`
+		OutputPer1m *float64 `json:"output_per_1m,omitempty"`
+	} `json:"pricing,omitempty"`
 
-	// PromptTemplate User message template (default: {{ .input.input }} or the JSON of input)
-	PromptTemplate       *string                `json:"prompt_template,omitempty"`
-	SystemPrompt         *string                `json:"system_prompt,omitempty"`
-	Temperature          *float64               `json:"temperature,omitempty"`
-	Tools                *[]JSONObject          `json:"tools,omitempty"`
-	TopP                 *float64               `json:"top_p,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
+	// ProjectId Set for Vertex AI; omit for the Gemini API
+	ProjectId    *string  `json:"project_id,omitempty"`
+	SystemPrompt *string  `json:"system_prompt,omitempty"`
+	Temperature  *float64 `json:"temperature,omitempty"`
+	TimeoutMs    *int     `json:"timeout_ms,omitempty"`
+
+	// Tls PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}`
+	Tls   *TLSConfig    `json:"tls,omitempty"`
+	Tools *[]JSONObject `json:"tools,omitempty"`
+
+	// UserTemplate User message template (default: the lone string in the input, else its JSON)
+	UserTemplate *string `json:"user_template,omitempty"`
 }
 
 // Cursor defines model for Cursor.
@@ -2640,8 +2968,14 @@ type CompareRunsParams struct {
 	// EvaluatorId Evaluator used to rank regressions (default first common)
 	EvaluatorId *openapi_types.UUID `form:"evaluator_id,omitempty" json:"evaluator_id,omitempty"`
 
-	// Limit Max regressions/improvements returned
+	// Against Run (one of `runs`) whose regressions/improvements and scatter are listed against the baseline (default the second run)
+	Against *openapi_types.UUID `form:"against,omitempty" json:"against,omitempty"`
+
+	// Limit Page size for regressions/improvements/rows
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Offset into the ranked regressions/improvements/rows lists
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // ListExamplesParams defines parameters for ListExamples.
@@ -2677,8 +3011,13 @@ type ExportDatasetVersionParamsFormat string
 type ImportDatasetMultipartBody struct {
 	File openapi_types.File `json:"file"`
 
-	// Options JSON-encoded DatasetImportRequest (without source.url/hf)
+	// Options JSON-encoded DatasetImportRequest (mapping, mode, tags, publish, source.format/limit)
 	Options *string `json:"options,omitempty"`
+}
+
+// ImportDatasetParams defines parameters for ImportDataset.
+type ImportDatasetParams struct {
+	Preview *bool `form:"preview,omitempty" json:"preview,omitempty"`
 }
 
 // ListApiKeysParams defines parameters for ListApiKeys.
@@ -2977,6 +3316,9 @@ type CreateGateJSONRequestBody = GateCreate
 // UpdateGateJSONRequestBody defines body for UpdateGate for application/json ContentType.
 type UpdateGateJSONRequestBody = GateUpdate
 
+// ValidateGateJSONRequestBody defines body for ValidateGate for application/json ContentType.
+type ValidateGateJSONRequestBody = GateValidateRequest
+
 // CreateTriggerJSONRequestBody defines body for CreateTrigger for application/json ContentType.
 type CreateTriggerJSONRequestBody = TriggerCreate
 
@@ -2988,502 +3330,6 @@ type UpdateTargetJSONRequestBody = TargetUpdate
 
 // TestTargetJSONRequestBody defines body for TestTarget for application/json ContentType.
 type TestTargetJSONRequestBody = TargetTestRequest
-
-// Getter for additional properties for AnthropicTargetConfig. Returns the specified
-// element and whether it was found
-func (a AnthropicTargetConfig) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for AnthropicTargetConfig
-func (a *AnthropicTargetConfig) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for AnthropicTargetConfig to handle AdditionalProperties
-func (a *AnthropicTargetConfig) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["anthropic_version"]; found {
-		err = json.Unmarshal(raw, &a.AnthropicVersion)
-		if err != nil {
-			return fmt.Errorf("error reading 'anthropic_version': %w", err)
-		}
-		delete(object, "anthropic_version")
-	}
-
-	if raw, found := object["api_key_secret"]; found {
-		err = json.Unmarshal(raw, &a.ApiKeySecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'api_key_secret': %w", err)
-		}
-		delete(object, "api_key_secret")
-	}
-
-	if raw, found := object["base_url"]; found {
-		err = json.Unmarshal(raw, &a.BaseUrl)
-		if err != nil {
-			return fmt.Errorf("error reading 'base_url': %w", err)
-		}
-		delete(object, "base_url")
-	}
-
-	if raw, found := object["extra_body"]; found {
-		err = json.Unmarshal(raw, &a.ExtraBody)
-		if err != nil {
-			return fmt.Errorf("error reading 'extra_body': %w", err)
-		}
-		delete(object, "extra_body")
-	}
-
-	if raw, found := object["json_mode"]; found {
-		err = json.Unmarshal(raw, &a.JsonMode)
-		if err != nil {
-			return fmt.Errorf("error reading 'json_mode': %w", err)
-		}
-		delete(object, "json_mode")
-	}
-
-	if raw, found := object["max_tokens"]; found {
-		err = json.Unmarshal(raw, &a.MaxTokens)
-		if err != nil {
-			return fmt.Errorf("error reading 'max_tokens': %w", err)
-		}
-		delete(object, "max_tokens")
-	}
-
-	if raw, found := object["model"]; found {
-		err = json.Unmarshal(raw, &a.Model)
-		if err != nil {
-			return fmt.Errorf("error reading 'model': %w", err)
-		}
-		delete(object, "model")
-	}
-
-	if raw, found := object["prompt_template"]; found {
-		err = json.Unmarshal(raw, &a.PromptTemplate)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt_template': %w", err)
-		}
-		delete(object, "prompt_template")
-	}
-
-	if raw, found := object["system_prompt"]; found {
-		err = json.Unmarshal(raw, &a.SystemPrompt)
-		if err != nil {
-			return fmt.Errorf("error reading 'system_prompt': %w", err)
-		}
-		delete(object, "system_prompt")
-	}
-
-	if raw, found := object["temperature"]; found {
-		err = json.Unmarshal(raw, &a.Temperature)
-		if err != nil {
-			return fmt.Errorf("error reading 'temperature': %w", err)
-		}
-		delete(object, "temperature")
-	}
-
-	if raw, found := object["tools"]; found {
-		err = json.Unmarshal(raw, &a.Tools)
-		if err != nil {
-			return fmt.Errorf("error reading 'tools': %w", err)
-		}
-		delete(object, "tools")
-	}
-
-	if raw, found := object["top_p"]; found {
-		err = json.Unmarshal(raw, &a.TopP)
-		if err != nil {
-			return fmt.Errorf("error reading 'top_p': %w", err)
-		}
-		delete(object, "top_p")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for AnthropicTargetConfig to handle AdditionalProperties
-func (a AnthropicTargetConfig) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.AnthropicVersion != nil {
-		object["anthropic_version"], err = json.Marshal(a.AnthropicVersion)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'anthropic_version': %w", err)
-		}
-	}
-
-	if a.ApiKeySecret != nil {
-		object["api_key_secret"], err = json.Marshal(a.ApiKeySecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'api_key_secret': %w", err)
-		}
-	}
-
-	if a.BaseUrl != nil {
-		object["base_url"], err = json.Marshal(a.BaseUrl)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'base_url': %w", err)
-		}
-	}
-
-	if a.ExtraBody != nil {
-		object["extra_body"], err = json.Marshal(a.ExtraBody)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'extra_body': %w", err)
-		}
-	}
-
-	if a.JsonMode != nil {
-		object["json_mode"], err = json.Marshal(a.JsonMode)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'json_mode': %w", err)
-		}
-	}
-
-	if a.MaxTokens != nil {
-		object["max_tokens"], err = json.Marshal(a.MaxTokens)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
-		}
-	}
-
-	if a.Model != nil {
-		object["model"], err = json.Marshal(a.Model)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'model': %w", err)
-		}
-	}
-
-	if a.PromptTemplate != nil {
-		object["prompt_template"], err = json.Marshal(a.PromptTemplate)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'prompt_template': %w", err)
-		}
-	}
-
-	if a.SystemPrompt != nil {
-		object["system_prompt"], err = json.Marshal(a.SystemPrompt)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'system_prompt': %w", err)
-		}
-	}
-
-	if a.Temperature != nil {
-		object["temperature"], err = json.Marshal(a.Temperature)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
-		}
-	}
-
-	if a.Tools != nil {
-		object["tools"], err = json.Marshal(a.Tools)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
-		}
-	}
-
-	if a.TopP != nil {
-		object["top_p"], err = json.Marshal(a.TopP)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
-// Getter for additional properties for BedrockTargetConfig. Returns the specified
-// element and whether it was found
-func (a BedrockTargetConfig) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for BedrockTargetConfig
-func (a *BedrockTargetConfig) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for BedrockTargetConfig to handle AdditionalProperties
-func (a *BedrockTargetConfig) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["access_key_id_secret"]; found {
-		err = json.Unmarshal(raw, &a.AccessKeyIdSecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'access_key_id_secret': %w", err)
-		}
-		delete(object, "access_key_id_secret")
-	}
-
-	if raw, found := object["extra_body"]; found {
-		err = json.Unmarshal(raw, &a.ExtraBody)
-		if err != nil {
-			return fmt.Errorf("error reading 'extra_body': %w", err)
-		}
-		delete(object, "extra_body")
-	}
-
-	if raw, found := object["json_mode"]; found {
-		err = json.Unmarshal(raw, &a.JsonMode)
-		if err != nil {
-			return fmt.Errorf("error reading 'json_mode': %w", err)
-		}
-		delete(object, "json_mode")
-	}
-
-	if raw, found := object["max_tokens"]; found {
-		err = json.Unmarshal(raw, &a.MaxTokens)
-		if err != nil {
-			return fmt.Errorf("error reading 'max_tokens': %w", err)
-		}
-		delete(object, "max_tokens")
-	}
-
-	if raw, found := object["model"]; found {
-		err = json.Unmarshal(raw, &a.Model)
-		if err != nil {
-			return fmt.Errorf("error reading 'model': %w", err)
-		}
-		delete(object, "model")
-	}
-
-	if raw, found := object["model_id"]; found {
-		err = json.Unmarshal(raw, &a.ModelId)
-		if err != nil {
-			return fmt.Errorf("error reading 'model_id': %w", err)
-		}
-		delete(object, "model_id")
-	}
-
-	if raw, found := object["prompt_template"]; found {
-		err = json.Unmarshal(raw, &a.PromptTemplate)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt_template': %w", err)
-		}
-		delete(object, "prompt_template")
-	}
-
-	if raw, found := object["region"]; found {
-		err = json.Unmarshal(raw, &a.Region)
-		if err != nil {
-			return fmt.Errorf("error reading 'region': %w", err)
-		}
-		delete(object, "region")
-	}
-
-	if raw, found := object["secret_access_key_secret"]; found {
-		err = json.Unmarshal(raw, &a.SecretAccessKeySecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'secret_access_key_secret': %w", err)
-		}
-		delete(object, "secret_access_key_secret")
-	}
-
-	if raw, found := object["session_token_secret"]; found {
-		err = json.Unmarshal(raw, &a.SessionTokenSecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'session_token_secret': %w", err)
-		}
-		delete(object, "session_token_secret")
-	}
-
-	if raw, found := object["system_prompt"]; found {
-		err = json.Unmarshal(raw, &a.SystemPrompt)
-		if err != nil {
-			return fmt.Errorf("error reading 'system_prompt': %w", err)
-		}
-		delete(object, "system_prompt")
-	}
-
-	if raw, found := object["temperature"]; found {
-		err = json.Unmarshal(raw, &a.Temperature)
-		if err != nil {
-			return fmt.Errorf("error reading 'temperature': %w", err)
-		}
-		delete(object, "temperature")
-	}
-
-	if raw, found := object["tools"]; found {
-		err = json.Unmarshal(raw, &a.Tools)
-		if err != nil {
-			return fmt.Errorf("error reading 'tools': %w", err)
-		}
-		delete(object, "tools")
-	}
-
-	if raw, found := object["top_p"]; found {
-		err = json.Unmarshal(raw, &a.TopP)
-		if err != nil {
-			return fmt.Errorf("error reading 'top_p': %w", err)
-		}
-		delete(object, "top_p")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for BedrockTargetConfig to handle AdditionalProperties
-func (a BedrockTargetConfig) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.AccessKeyIdSecret != nil {
-		object["access_key_id_secret"], err = json.Marshal(a.AccessKeyIdSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'access_key_id_secret': %w", err)
-		}
-	}
-
-	if a.ExtraBody != nil {
-		object["extra_body"], err = json.Marshal(a.ExtraBody)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'extra_body': %w", err)
-		}
-	}
-
-	if a.JsonMode != nil {
-		object["json_mode"], err = json.Marshal(a.JsonMode)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'json_mode': %w", err)
-		}
-	}
-
-	if a.MaxTokens != nil {
-		object["max_tokens"], err = json.Marshal(a.MaxTokens)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
-		}
-	}
-
-	if a.Model != nil {
-		object["model"], err = json.Marshal(a.Model)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'model': %w", err)
-		}
-	}
-
-	if a.ModelId != nil {
-		object["model_id"], err = json.Marshal(a.ModelId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'model_id': %w", err)
-		}
-	}
-
-	if a.PromptTemplate != nil {
-		object["prompt_template"], err = json.Marshal(a.PromptTemplate)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'prompt_template': %w", err)
-		}
-	}
-
-	if a.Region != nil {
-		object["region"], err = json.Marshal(a.Region)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'region': %w", err)
-		}
-	}
-
-	if a.SecretAccessKeySecret != nil {
-		object["secret_access_key_secret"], err = json.Marshal(a.SecretAccessKeySecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'secret_access_key_secret': %w", err)
-		}
-	}
-
-	if a.SessionTokenSecret != nil {
-		object["session_token_secret"], err = json.Marshal(a.SessionTokenSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'session_token_secret': %w", err)
-		}
-	}
-
-	if a.SystemPrompt != nil {
-		object["system_prompt"], err = json.Marshal(a.SystemPrompt)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'system_prompt': %w", err)
-		}
-	}
-
-	if a.Temperature != nil {
-		object["temperature"], err = json.Marshal(a.Temperature)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
-		}
-	}
-
-	if a.Tools != nil {
-		object["tools"], err = json.Marshal(a.Tools)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
-		}
-	}
-
-	if a.TopP != nil {
-		object["top_p"], err = json.Marshal(a.TopP)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
 
 // Getter for additional properties for CachePolicy. Returns the specified
 // element and whether it was found
@@ -3655,207 +3501,6 @@ func (a ConversationConfig) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'state': %w", err)
 		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
-// Getter for additional properties for HttpTargetConfig. Returns the specified
-// element and whether it was found
-func (a HttpTargetConfig) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for HttpTargetConfig
-func (a *HttpTargetConfig) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for HttpTargetConfig to handle AdditionalProperties
-func (a *HttpTargetConfig) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["body"]; found {
-		err = json.Unmarshal(raw, &a.Body)
-		if err != nil {
-			return fmt.Errorf("error reading 'body': %w", err)
-		}
-		delete(object, "body")
-	}
-
-	if raw, found := object["headers"]; found {
-		err = json.Unmarshal(raw, &a.Headers)
-		if err != nil {
-			return fmt.Errorf("error reading 'headers': %w", err)
-		}
-		delete(object, "headers")
-	}
-
-	if raw, found := object["method"]; found {
-		err = json.Unmarshal(raw, &a.Method)
-		if err != nil {
-			return fmt.Errorf("error reading 'method': %w", err)
-		}
-		delete(object, "method")
-	}
-
-	if raw, found := object["query"]; found {
-		err = json.Unmarshal(raw, &a.Query)
-		if err != nil {
-			return fmt.Errorf("error reading 'query': %w", err)
-		}
-		delete(object, "query")
-	}
-
-	if raw, found := object["response"]; found {
-		err = json.Unmarshal(raw, &a.Response)
-		if err != nil {
-			return fmt.Errorf("error reading 'response': %w", err)
-		}
-		delete(object, "response")
-	}
-
-	if raw, found := object["retries"]; found {
-		err = json.Unmarshal(raw, &a.Retries)
-		if err != nil {
-			return fmt.Errorf("error reading 'retries': %w", err)
-		}
-		delete(object, "retries")
-	}
-
-	if raw, found := object["streaming"]; found {
-		err = json.Unmarshal(raw, &a.Streaming)
-		if err != nil {
-			return fmt.Errorf("error reading 'streaming': %w", err)
-		}
-		delete(object, "streaming")
-	}
-
-	if raw, found := object["timeout_ms"]; found {
-		err = json.Unmarshal(raw, &a.TimeoutMs)
-		if err != nil {
-			return fmt.Errorf("error reading 'timeout_ms': %w", err)
-		}
-		delete(object, "timeout_ms")
-	}
-
-	if raw, found := object["tls"]; found {
-		err = json.Unmarshal(raw, &a.Tls)
-		if err != nil {
-			return fmt.Errorf("error reading 'tls': %w", err)
-		}
-		delete(object, "tls")
-	}
-
-	if raw, found := object["url"]; found {
-		err = json.Unmarshal(raw, &a.Url)
-		if err != nil {
-			return fmt.Errorf("error reading 'url': %w", err)
-		}
-		delete(object, "url")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for HttpTargetConfig to handle AdditionalProperties
-func (a HttpTargetConfig) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.Body != nil {
-		object["body"], err = json.Marshal(a.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'body': %w", err)
-		}
-	}
-
-	if a.Headers != nil {
-		object["headers"], err = json.Marshal(a.Headers)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'headers': %w", err)
-		}
-	}
-
-	if a.Method != nil {
-		object["method"], err = json.Marshal(a.Method)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'method': %w", err)
-		}
-	}
-
-	if a.Query != nil {
-		object["query"], err = json.Marshal(a.Query)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'query': %w", err)
-		}
-	}
-
-	if a.Response != nil {
-		object["response"], err = json.Marshal(a.Response)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'response': %w", err)
-		}
-	}
-
-	if a.Retries != nil {
-		object["retries"], err = json.Marshal(a.Retries)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'retries': %w", err)
-		}
-	}
-
-	if a.Streaming != nil {
-		object["streaming"], err = json.Marshal(a.Streaming)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'streaming': %w", err)
-		}
-	}
-
-	if a.TimeoutMs != nil {
-		object["timeout_ms"], err = json.Marshal(a.TimeoutMs)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'timeout_ms': %w", err)
-		}
-	}
-
-	if a.Tls != nil {
-		object["tls"], err = json.Marshal(a.Tls)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'tls': %w", err)
-		}
-	}
-
-	object["url"], err = json.Marshal(a.Url)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'url': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -4085,773 +3730,6 @@ func (a JudgeModelConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-// Getter for additional properties for LLMSamplingConfig. Returns the specified
-// element and whether it was found
-func (a LLMSamplingConfig) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for LLMSamplingConfig
-func (a *LLMSamplingConfig) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for LLMSamplingConfig to handle AdditionalProperties
-func (a *LLMSamplingConfig) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["extra_body"]; found {
-		err = json.Unmarshal(raw, &a.ExtraBody)
-		if err != nil {
-			return fmt.Errorf("error reading 'extra_body': %w", err)
-		}
-		delete(object, "extra_body")
-	}
-
-	if raw, found := object["json_mode"]; found {
-		err = json.Unmarshal(raw, &a.JsonMode)
-		if err != nil {
-			return fmt.Errorf("error reading 'json_mode': %w", err)
-		}
-		delete(object, "json_mode")
-	}
-
-	if raw, found := object["max_tokens"]; found {
-		err = json.Unmarshal(raw, &a.MaxTokens)
-		if err != nil {
-			return fmt.Errorf("error reading 'max_tokens': %w", err)
-		}
-		delete(object, "max_tokens")
-	}
-
-	if raw, found := object["model"]; found {
-		err = json.Unmarshal(raw, &a.Model)
-		if err != nil {
-			return fmt.Errorf("error reading 'model': %w", err)
-		}
-		delete(object, "model")
-	}
-
-	if raw, found := object["prompt_template"]; found {
-		err = json.Unmarshal(raw, &a.PromptTemplate)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt_template': %w", err)
-		}
-		delete(object, "prompt_template")
-	}
-
-	if raw, found := object["system_prompt"]; found {
-		err = json.Unmarshal(raw, &a.SystemPrompt)
-		if err != nil {
-			return fmt.Errorf("error reading 'system_prompt': %w", err)
-		}
-		delete(object, "system_prompt")
-	}
-
-	if raw, found := object["temperature"]; found {
-		err = json.Unmarshal(raw, &a.Temperature)
-		if err != nil {
-			return fmt.Errorf("error reading 'temperature': %w", err)
-		}
-		delete(object, "temperature")
-	}
-
-	if raw, found := object["tools"]; found {
-		err = json.Unmarshal(raw, &a.Tools)
-		if err != nil {
-			return fmt.Errorf("error reading 'tools': %w", err)
-		}
-		delete(object, "tools")
-	}
-
-	if raw, found := object["top_p"]; found {
-		err = json.Unmarshal(raw, &a.TopP)
-		if err != nil {
-			return fmt.Errorf("error reading 'top_p': %w", err)
-		}
-		delete(object, "top_p")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for LLMSamplingConfig to handle AdditionalProperties
-func (a LLMSamplingConfig) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.ExtraBody != nil {
-		object["extra_body"], err = json.Marshal(a.ExtraBody)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'extra_body': %w", err)
-		}
-	}
-
-	if a.JsonMode != nil {
-		object["json_mode"], err = json.Marshal(a.JsonMode)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'json_mode': %w", err)
-		}
-	}
-
-	if a.MaxTokens != nil {
-		object["max_tokens"], err = json.Marshal(a.MaxTokens)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
-		}
-	}
-
-	if a.Model != nil {
-		object["model"], err = json.Marshal(a.Model)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'model': %w", err)
-		}
-	}
-
-	if a.PromptTemplate != nil {
-		object["prompt_template"], err = json.Marshal(a.PromptTemplate)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'prompt_template': %w", err)
-		}
-	}
-
-	if a.SystemPrompt != nil {
-		object["system_prompt"], err = json.Marshal(a.SystemPrompt)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'system_prompt': %w", err)
-		}
-	}
-
-	if a.Temperature != nil {
-		object["temperature"], err = json.Marshal(a.Temperature)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
-		}
-	}
-
-	if a.Tools != nil {
-		object["tools"], err = json.Marshal(a.Tools)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
-		}
-	}
-
-	if a.TopP != nil {
-		object["top_p"], err = json.Marshal(a.TopP)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
-// Getter for additional properties for OpenAITargetConfig. Returns the specified
-// element and whether it was found
-func (a OpenAITargetConfig) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for OpenAITargetConfig
-func (a *OpenAITargetConfig) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for OpenAITargetConfig to handle AdditionalProperties
-func (a *OpenAITargetConfig) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["api_key_secret"]; found {
-		err = json.Unmarshal(raw, &a.ApiKeySecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'api_key_secret': %w", err)
-		}
-		delete(object, "api_key_secret")
-	}
-
-	if raw, found := object["api_version"]; found {
-		err = json.Unmarshal(raw, &a.ApiVersion)
-		if err != nil {
-			return fmt.Errorf("error reading 'api_version': %w", err)
-		}
-		delete(object, "api_version")
-	}
-
-	if raw, found := object["base_url"]; found {
-		err = json.Unmarshal(raw, &a.BaseUrl)
-		if err != nil {
-			return fmt.Errorf("error reading 'base_url': %w", err)
-		}
-		delete(object, "base_url")
-	}
-
-	if raw, found := object["deployment"]; found {
-		err = json.Unmarshal(raw, &a.Deployment)
-		if err != nil {
-			return fmt.Errorf("error reading 'deployment': %w", err)
-		}
-		delete(object, "deployment")
-	}
-
-	if raw, found := object["extra_body"]; found {
-		err = json.Unmarshal(raw, &a.ExtraBody)
-		if err != nil {
-			return fmt.Errorf("error reading 'extra_body': %w", err)
-		}
-		delete(object, "extra_body")
-	}
-
-	if raw, found := object["json_mode"]; found {
-		err = json.Unmarshal(raw, &a.JsonMode)
-		if err != nil {
-			return fmt.Errorf("error reading 'json_mode': %w", err)
-		}
-		delete(object, "json_mode")
-	}
-
-	if raw, found := object["max_tokens"]; found {
-		err = json.Unmarshal(raw, &a.MaxTokens)
-		if err != nil {
-			return fmt.Errorf("error reading 'max_tokens': %w", err)
-		}
-		delete(object, "max_tokens")
-	}
-
-	if raw, found := object["model"]; found {
-		err = json.Unmarshal(raw, &a.Model)
-		if err != nil {
-			return fmt.Errorf("error reading 'model': %w", err)
-		}
-		delete(object, "model")
-	}
-
-	if raw, found := object["organization"]; found {
-		err = json.Unmarshal(raw, &a.Organization)
-		if err != nil {
-			return fmt.Errorf("error reading 'organization': %w", err)
-		}
-		delete(object, "organization")
-	}
-
-	if raw, found := object["prompt_template"]; found {
-		err = json.Unmarshal(raw, &a.PromptTemplate)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt_template': %w", err)
-		}
-		delete(object, "prompt_template")
-	}
-
-	if raw, found := object["system_prompt"]; found {
-		err = json.Unmarshal(raw, &a.SystemPrompt)
-		if err != nil {
-			return fmt.Errorf("error reading 'system_prompt': %w", err)
-		}
-		delete(object, "system_prompt")
-	}
-
-	if raw, found := object["temperature"]; found {
-		err = json.Unmarshal(raw, &a.Temperature)
-		if err != nil {
-			return fmt.Errorf("error reading 'temperature': %w", err)
-		}
-		delete(object, "temperature")
-	}
-
-	if raw, found := object["tools"]; found {
-		err = json.Unmarshal(raw, &a.Tools)
-		if err != nil {
-			return fmt.Errorf("error reading 'tools': %w", err)
-		}
-		delete(object, "tools")
-	}
-
-	if raw, found := object["top_p"]; found {
-		err = json.Unmarshal(raw, &a.TopP)
-		if err != nil {
-			return fmt.Errorf("error reading 'top_p': %w", err)
-		}
-		delete(object, "top_p")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for OpenAITargetConfig to handle AdditionalProperties
-func (a OpenAITargetConfig) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.ApiKeySecret != nil {
-		object["api_key_secret"], err = json.Marshal(a.ApiKeySecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'api_key_secret': %w", err)
-		}
-	}
-
-	if a.ApiVersion != nil {
-		object["api_version"], err = json.Marshal(a.ApiVersion)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'api_version': %w", err)
-		}
-	}
-
-	if a.BaseUrl != nil {
-		object["base_url"], err = json.Marshal(a.BaseUrl)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'base_url': %w", err)
-		}
-	}
-
-	if a.Deployment != nil {
-		object["deployment"], err = json.Marshal(a.Deployment)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'deployment': %w", err)
-		}
-	}
-
-	if a.ExtraBody != nil {
-		object["extra_body"], err = json.Marshal(a.ExtraBody)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'extra_body': %w", err)
-		}
-	}
-
-	if a.JsonMode != nil {
-		object["json_mode"], err = json.Marshal(a.JsonMode)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'json_mode': %w", err)
-		}
-	}
-
-	if a.MaxTokens != nil {
-		object["max_tokens"], err = json.Marshal(a.MaxTokens)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
-		}
-	}
-
-	if a.Model != nil {
-		object["model"], err = json.Marshal(a.Model)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'model': %w", err)
-		}
-	}
-
-	if a.Organization != nil {
-		object["organization"], err = json.Marshal(a.Organization)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'organization': %w", err)
-		}
-	}
-
-	if a.PromptTemplate != nil {
-		object["prompt_template"], err = json.Marshal(a.PromptTemplate)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'prompt_template': %w", err)
-		}
-	}
-
-	if a.SystemPrompt != nil {
-		object["system_prompt"], err = json.Marshal(a.SystemPrompt)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'system_prompt': %w", err)
-		}
-	}
-
-	if a.Temperature != nil {
-		object["temperature"], err = json.Marshal(a.Temperature)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
-		}
-	}
-
-	if a.Tools != nil {
-		object["tools"], err = json.Marshal(a.Tools)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
-		}
-	}
-
-	if a.TopP != nil {
-		object["top_p"], err = json.Marshal(a.TopP)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
-// Getter for additional properties for ResponseMapping. Returns the specified
-// element and whether it was found
-func (a ResponseMapping) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for ResponseMapping
-func (a *ResponseMapping) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for ResponseMapping to handle AdditionalProperties
-func (a *ResponseMapping) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["context"]; found {
-		err = json.Unmarshal(raw, &a.Context)
-		if err != nil {
-			return fmt.Errorf("error reading 'context': %w", err)
-		}
-		delete(object, "context")
-	}
-
-	if raw, found := object["cost_usd"]; found {
-		err = json.Unmarshal(raw, &a.CostUsd)
-		if err != nil {
-			return fmt.Errorf("error reading 'cost_usd': %w", err)
-		}
-		delete(object, "cost_usd")
-	}
-
-	if raw, found := object["output"]; found {
-		err = json.Unmarshal(raw, &a.Output)
-		if err != nil {
-			return fmt.Errorf("error reading 'output': %w", err)
-		}
-		delete(object, "output")
-	}
-
-	if raw, found := object["output_json"]; found {
-		err = json.Unmarshal(raw, &a.OutputJson)
-		if err != nil {
-			return fmt.Errorf("error reading 'output_json': %w", err)
-		}
-		delete(object, "output_json")
-	}
-
-	if raw, found := object["session_id"]; found {
-		err = json.Unmarshal(raw, &a.SessionId)
-		if err != nil {
-			return fmt.Errorf("error reading 'session_id': %w", err)
-		}
-		delete(object, "session_id")
-	}
-
-	if raw, found := object["stream_delta"]; found {
-		err = json.Unmarshal(raw, &a.StreamDelta)
-		if err != nil {
-			return fmt.Errorf("error reading 'stream_delta': %w", err)
-		}
-		delete(object, "stream_delta")
-	}
-
-	if raw, found := object["tool_calls"]; found {
-		err = json.Unmarshal(raw, &a.ToolCalls)
-		if err != nil {
-			return fmt.Errorf("error reading 'tool_calls': %w", err)
-		}
-		delete(object, "tool_calls")
-	}
-
-	if raw, found := object["trace"]; found {
-		err = json.Unmarshal(raw, &a.Trace)
-		if err != nil {
-			return fmt.Errorf("error reading 'trace': %w", err)
-		}
-		delete(object, "trace")
-	}
-
-	if raw, found := object["usage_input_tokens"]; found {
-		err = json.Unmarshal(raw, &a.UsageInputTokens)
-		if err != nil {
-			return fmt.Errorf("error reading 'usage_input_tokens': %w", err)
-		}
-		delete(object, "usage_input_tokens")
-	}
-
-	if raw, found := object["usage_output_tokens"]; found {
-		err = json.Unmarshal(raw, &a.UsageOutputTokens)
-		if err != nil {
-			return fmt.Errorf("error reading 'usage_output_tokens': %w", err)
-		}
-		delete(object, "usage_output_tokens")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for ResponseMapping to handle AdditionalProperties
-func (a ResponseMapping) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.Context != nil {
-		object["context"], err = json.Marshal(a.Context)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'context': %w", err)
-		}
-	}
-
-	if a.CostUsd != nil {
-		object["cost_usd"], err = json.Marshal(a.CostUsd)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'cost_usd': %w", err)
-		}
-	}
-
-	if a.Output != nil {
-		object["output"], err = json.Marshal(a.Output)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'output': %w", err)
-		}
-	}
-
-	if a.OutputJson != nil {
-		object["output_json"], err = json.Marshal(a.OutputJson)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'output_json': %w", err)
-		}
-	}
-
-	if a.SessionId != nil {
-		object["session_id"], err = json.Marshal(a.SessionId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'session_id': %w", err)
-		}
-	}
-
-	if a.StreamDelta != nil {
-		object["stream_delta"], err = json.Marshal(a.StreamDelta)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'stream_delta': %w", err)
-		}
-	}
-
-	if a.ToolCalls != nil {
-		object["tool_calls"], err = json.Marshal(a.ToolCalls)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'tool_calls': %w", err)
-		}
-	}
-
-	if a.Trace != nil {
-		object["trace"], err = json.Marshal(a.Trace)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'trace': %w", err)
-		}
-	}
-
-	if a.UsageInputTokens != nil {
-		object["usage_input_tokens"], err = json.Marshal(a.UsageInputTokens)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'usage_input_tokens': %w", err)
-		}
-	}
-
-	if a.UsageOutputTokens != nil {
-		object["usage_output_tokens"], err = json.Marshal(a.UsageOutputTokens)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'usage_output_tokens': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
-// Getter for additional properties for TLSConfig. Returns the specified
-// element and whether it was found
-func (a TLSConfig) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for TLSConfig
-func (a *TLSConfig) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for TLSConfig to handle AdditionalProperties
-func (a *TLSConfig) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["ca_cert_secret"]; found {
-		err = json.Unmarshal(raw, &a.CaCertSecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'ca_cert_secret': %w", err)
-		}
-		delete(object, "ca_cert_secret")
-	}
-
-	if raw, found := object["client_cert_secret"]; found {
-		err = json.Unmarshal(raw, &a.ClientCertSecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'client_cert_secret': %w", err)
-		}
-		delete(object, "client_cert_secret")
-	}
-
-	if raw, found := object["client_key_secret"]; found {
-		err = json.Unmarshal(raw, &a.ClientKeySecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'client_key_secret': %w", err)
-		}
-		delete(object, "client_key_secret")
-	}
-
-	if raw, found := object["insecure_skip_verify"]; found {
-		err = json.Unmarshal(raw, &a.InsecureSkipVerify)
-		if err != nil {
-			return fmt.Errorf("error reading 'insecure_skip_verify': %w", err)
-		}
-		delete(object, "insecure_skip_verify")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for TLSConfig to handle AdditionalProperties
-func (a TLSConfig) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.CaCertSecret != nil {
-		object["ca_cert_secret"], err = json.Marshal(a.CaCertSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'ca_cert_secret': %w", err)
-		}
-	}
-
-	if a.ClientCertSecret != nil {
-		object["client_cert_secret"], err = json.Marshal(a.ClientCertSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'client_cert_secret': %w", err)
-		}
-	}
-
-	if a.ClientKeySecret != nil {
-		object["client_key_secret"], err = json.Marshal(a.ClientKeySecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'client_key_secret': %w", err)
-		}
-	}
-
-	if a.InsecureSkipVerify != nil {
-		object["insecure_skip_verify"], err = json.Marshal(a.InsecureSkipVerify)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'insecure_skip_verify': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
 // Getter for additional properties for TargetLimits. Returns the specified
 // element and whether it was found
 func (a TargetLimits) Get(fieldName string) (value interface{}, found bool) {
@@ -4965,239 +3843,6 @@ func (a TargetLimits) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-// Getter for additional properties for VertexTargetConfig. Returns the specified
-// element and whether it was found
-func (a VertexTargetConfig) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for VertexTargetConfig
-func (a *VertexTargetConfig) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for VertexTargetConfig to handle AdditionalProperties
-func (a *VertexTargetConfig) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["credentials_secret"]; found {
-		err = json.Unmarshal(raw, &a.CredentialsSecret)
-		if err != nil {
-			return fmt.Errorf("error reading 'credentials_secret': %w", err)
-		}
-		delete(object, "credentials_secret")
-	}
-
-	if raw, found := object["extra_body"]; found {
-		err = json.Unmarshal(raw, &a.ExtraBody)
-		if err != nil {
-			return fmt.Errorf("error reading 'extra_body': %w", err)
-		}
-		delete(object, "extra_body")
-	}
-
-	if raw, found := object["json_mode"]; found {
-		err = json.Unmarshal(raw, &a.JsonMode)
-		if err != nil {
-			return fmt.Errorf("error reading 'json_mode': %w", err)
-		}
-		delete(object, "json_mode")
-	}
-
-	if raw, found := object["location"]; found {
-		err = json.Unmarshal(raw, &a.Location)
-		if err != nil {
-			return fmt.Errorf("error reading 'location': %w", err)
-		}
-		delete(object, "location")
-	}
-
-	if raw, found := object["max_tokens"]; found {
-		err = json.Unmarshal(raw, &a.MaxTokens)
-		if err != nil {
-			return fmt.Errorf("error reading 'max_tokens': %w", err)
-		}
-		delete(object, "max_tokens")
-	}
-
-	if raw, found := object["model"]; found {
-		err = json.Unmarshal(raw, &a.Model)
-		if err != nil {
-			return fmt.Errorf("error reading 'model': %w", err)
-		}
-		delete(object, "model")
-	}
-
-	if raw, found := object["project"]; found {
-		err = json.Unmarshal(raw, &a.Project)
-		if err != nil {
-			return fmt.Errorf("error reading 'project': %w", err)
-		}
-		delete(object, "project")
-	}
-
-	if raw, found := object["prompt_template"]; found {
-		err = json.Unmarshal(raw, &a.PromptTemplate)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt_template': %w", err)
-		}
-		delete(object, "prompt_template")
-	}
-
-	if raw, found := object["system_prompt"]; found {
-		err = json.Unmarshal(raw, &a.SystemPrompt)
-		if err != nil {
-			return fmt.Errorf("error reading 'system_prompt': %w", err)
-		}
-		delete(object, "system_prompt")
-	}
-
-	if raw, found := object["temperature"]; found {
-		err = json.Unmarshal(raw, &a.Temperature)
-		if err != nil {
-			return fmt.Errorf("error reading 'temperature': %w", err)
-		}
-		delete(object, "temperature")
-	}
-
-	if raw, found := object["tools"]; found {
-		err = json.Unmarshal(raw, &a.Tools)
-		if err != nil {
-			return fmt.Errorf("error reading 'tools': %w", err)
-		}
-		delete(object, "tools")
-	}
-
-	if raw, found := object["top_p"]; found {
-		err = json.Unmarshal(raw, &a.TopP)
-		if err != nil {
-			return fmt.Errorf("error reading 'top_p': %w", err)
-		}
-		delete(object, "top_p")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for VertexTargetConfig to handle AdditionalProperties
-func (a VertexTargetConfig) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.CredentialsSecret != nil {
-		object["credentials_secret"], err = json.Marshal(a.CredentialsSecret)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'credentials_secret': %w", err)
-		}
-	}
-
-	if a.ExtraBody != nil {
-		object["extra_body"], err = json.Marshal(a.ExtraBody)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'extra_body': %w", err)
-		}
-	}
-
-	if a.JsonMode != nil {
-		object["json_mode"], err = json.Marshal(a.JsonMode)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'json_mode': %w", err)
-		}
-	}
-
-	if a.Location != nil {
-		object["location"], err = json.Marshal(a.Location)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'location': %w", err)
-		}
-	}
-
-	if a.MaxTokens != nil {
-		object["max_tokens"], err = json.Marshal(a.MaxTokens)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'max_tokens': %w", err)
-		}
-	}
-
-	if a.Model != nil {
-		object["model"], err = json.Marshal(a.Model)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'model': %w", err)
-		}
-	}
-
-	if a.Project != nil {
-		object["project"], err = json.Marshal(a.Project)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'project': %w", err)
-		}
-	}
-
-	if a.PromptTemplate != nil {
-		object["prompt_template"], err = json.Marshal(a.PromptTemplate)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'prompt_template': %w", err)
-		}
-	}
-
-	if a.SystemPrompt != nil {
-		object["system_prompt"], err = json.Marshal(a.SystemPrompt)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'system_prompt': %w", err)
-		}
-	}
-
-	if a.Temperature != nil {
-		object["temperature"], err = json.Marshal(a.Temperature)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'temperature': %w", err)
-		}
-	}
-
-	if a.Tools != nil {
-		object["tools"], err = json.Marshal(a.Tools)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'tools': %w", err)
-		}
-	}
-
-	if a.TopP != nil {
-		object["top_p"], err = json.Marshal(a.TopP)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'top_p': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
@@ -5272,9 +3917,12 @@ type ServerInterface interface {
 	// AddExamplesFromResults Promote run results into the dataset draft ("Add to dataset")
 	// (POST /v1/datasets/{dataset}:from-results)
 	AddExamplesFromResults(w http.ResponseWriter, r *http.Request, dataset DatasetID)
-	// ImportDataset Import examples from CSV/JSONL/JSON/Parquet (upload or URL) or a public Hugging Face dataset, with column mapping. `preview=true` returns parsed rows without writing.
+	// ImportDataset Import examples from CSV/JSONL/JSON/Parquet (multipart upload or inline text) or a public Hugging Face dataset, with column mapping.
 	// (POST /v1/datasets/{dataset}:import)
-	ImportDataset(w http.ResponseWriter, r *http.Request, dataset DatasetID)
+	ImportDataset(w http.ResponseWriter, r *http.Request, dataset DatasetID, params ImportDatasetParams)
+	// GetEvaluatorCatalog Every evaluator kind with its category, defaults and config schema (renders the evaluator forms)
+	// (GET /v1/evaluators/catalog)
+	GetEvaluatorCatalog(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /v1/evaluators/{evaluator})
 	DeleteEvaluator(w http.ResponseWriter, r *http.Request, evaluator EvaluatorID)
@@ -5398,6 +4046,9 @@ type ServerInterface interface {
 
 	// (POST /v1/projects/{project}/evaluators)
 	CreateEvaluator(w http.ResponseWriter, r *http.Request, project ProjectID)
+	// GetProjectOverview Stat tiles for the project overview (runs, latest pass rate, average score, spend, failing gates)
+	// (GET /v1/projects/{project}/overview)
+	GetProjectOverview(w http.ResponseWriter, r *http.Request, project ProjectID)
 
 	// (GET /v1/projects/{project}/review-queues)
 	ListReviewQueues(w http.ResponseWriter, r *http.Request, project ProjectID, params ListReviewQueuesParams)
@@ -5509,6 +4160,9 @@ type ServerInterface interface {
 
 	// (PATCH /v1/suites/{suite}/gates/{gate})
 	UpdateGate(w http.ResponseWriter, r *http.Request, suite SuiteID, gate openapi_types.UUID)
+	// ValidateGate Parse and check a gate (text or AST) against the suite's evaluators without saving (live validation in the gate builder)
+	// (POST /v1/suites/{suite}/gates:validate)
+	ValidateGate(w http.ResponseWriter, r *http.Request, suite SuiteID)
 
 	// (GET /v1/suites/{suite}/triggers)
 	ListTriggers(w http.ResponseWriter, r *http.Request, suite SuiteID)
@@ -5679,9 +4333,15 @@ func (_ Unimplemented) AddExamplesFromResults(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ImportDataset Import examples from CSV/JSONL/JSON/Parquet (upload or URL) or a public Hugging Face dataset, with column mapping. `preview=true` returns parsed rows without writing.
+// ImportDataset Import examples from CSV/JSONL/JSON/Parquet (multipart upload or inline text) or a public Hugging Face dataset, with column mapping.
 // (POST /v1/datasets/{dataset}:import)
-func (_ Unimplemented) ImportDataset(w http.ResponseWriter, r *http.Request, dataset DatasetID) {
+func (_ Unimplemented) ImportDataset(w http.ResponseWriter, r *http.Request, dataset DatasetID, params ImportDatasetParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetEvaluatorCatalog Every evaluator kind with its category, defaults and config schema (renders the evaluator forms)
+// (GET /v1/evaluators/catalog)
+func (_ Unimplemented) GetEvaluatorCatalog(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5911,6 +4571,12 @@ func (_ Unimplemented) CreateEvaluator(w http.ResponseWriter, r *http.Request, p
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetProjectOverview Stat tiles for the project overview (runs, latest pass rate, average score, spend, failing gates)
+// (GET /v1/projects/{project}/overview)
+func (_ Unimplemented) GetProjectOverview(w http.ResponseWriter, r *http.Request, project ProjectID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /v1/projects/{project}/review-queues)
 func (_ Unimplemented) ListReviewQueues(w http.ResponseWriter, r *http.Request, project ProjectID, params ListReviewQueuesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -6103,6 +4769,12 @@ func (_ Unimplemented) DeleteGate(w http.ResponseWriter, r *http.Request, suite 
 
 // (PATCH /v1/suites/{suite}/gates/{gate})
 func (_ Unimplemented) UpdateGate(w http.ResponseWriter, r *http.Request, suite SuiteID, gate openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ValidateGate Parse and check a gate (text or AST) against the suite's evaluators without saving (live validation in the gate builder)
+// (POST /v1/suites/{suite}/gates:validate)
+func (_ Unimplemented) ValidateGate(w http.ResponseWriter, r *http.Request, suite SuiteID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -6455,6 +5127,19 @@ func (siw *ServerInterfaceWrapper) CompareRuns(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// ------------- Optional query parameter "against" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "against", r.URL.Query(), &params.Against, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "against"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "against", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "limit" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
@@ -6464,6 +5149,19 @@ func (siw *ServerInterfaceWrapper) CompareRuns(w http.ResponseWriter, r *http.Re
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
 		}
 		return
 	}
@@ -6998,8 +5696,38 @@ func (siw *ServerInterfaceWrapper) ImportDataset(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportDatasetParams
+
+	// ------------- Optional query parameter "preview" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "preview", r.URL.Query(), &params.Preview, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "preview"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "preview", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ImportDataset(w, r, dataset)
+		siw.Handler.ImportDataset(w, r, dataset, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEvaluatorCatalog operation middleware
+func (siw *ServerInterfaceWrapper) GetEvaluatorCatalog(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEvaluatorCatalog(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8400,6 +7128,32 @@ func (siw *ServerInterfaceWrapper) CreateEvaluator(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateEvaluator(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetProjectOverview operation middleware
+func (siw *ServerInterfaceWrapper) GetProjectOverview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", chi.URLParam(r, "project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetProjectOverview(w, r, project)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9940,6 +8694,32 @@ func (siw *ServerInterfaceWrapper) UpdateGate(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ValidateGate operation middleware
+func (siw *ServerInterfaceWrapper) ValidateGate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "suite" -------------
+	var suite SuiteID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "suite", chi.URLParam(r, "suite"), &suite, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "suite", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ValidateGate(w, r, suite)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTriggers operation middleware
 func (siw *ServerInterfaceWrapper) ListTriggers(w http.ResponseWriter, r *http.Request) {
 
@@ -10513,6 +9293,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/v1/projects/{project}", wrapper.UpdateProject)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/projects/{project}/overview", wrapper.GetProjectOverview)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/projects/{project}/trends", wrapper.GetTrends)
 	})
 	r.Group(func(r chi.Router) {
@@ -10603,6 +9386,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/v1/evaluators/{evaluator}", wrapper.UpdateEvaluator)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/evaluators/catalog", wrapper.GetEvaluatorCatalog)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/evaluators/{evaluator}/agreement", wrapper.GetEvaluatorAgreement)
 	})
 	r.Group(func(r chi.Router) {
@@ -10631,6 +9417,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/suites/{suite}/gates", wrapper.CreateGate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/suites/{suite}/gates:validate", wrapper.ValidateGate)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/v1/suites/{suite}/gates/{gate}", wrapper.DeleteGate)
@@ -11725,6 +10514,7 @@ func (response AddExamplesFromResultsdefaultJSONResponse) VisitAddExamplesFromRe
 
 type ImportDatasetRequestObject struct {
 	Dataset       DatasetID `json:"dataset"`
+	Params        ImportDatasetParams
 	JSONBody      *ImportDatasetJSONRequestBody
 	MultipartBody *multipart.Reader
 }
@@ -11753,6 +10543,44 @@ type ImportDatasetdefaultJSONResponse struct {
 }
 
 func (response ImportDatasetdefaultJSONResponse) VisitImportDatasetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEvaluatorCatalogRequestObject struct {
+}
+
+type GetEvaluatorCatalogResponseObject interface {
+	VisitGetEvaluatorCatalogResponse(w http.ResponseWriter) error
+}
+
+type GetEvaluatorCatalog200JSONResponse EvaluatorCatalog
+
+func (response GetEvaluatorCatalog200JSONResponse) VisitGetEvaluatorCatalogResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEvaluatorCatalogdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetEvaluatorCatalogdefaultJSONResponse) VisitGetEvaluatorCatalogResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -13344,6 +12172,45 @@ func (response CreateEvaluatordefaultJSONResponse) VisitCreateEvaluatorResponse(
 	return err
 }
 
+type GetProjectOverviewRequestObject struct {
+	Project ProjectID `json:"project"`
+}
+
+type GetProjectOverviewResponseObject interface {
+	VisitGetProjectOverviewResponse(w http.ResponseWriter) error
+}
+
+type GetProjectOverview200JSONResponse ProjectOverview
+
+func (response GetProjectOverview200JSONResponse) VisitGetProjectOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProjectOverviewdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetProjectOverviewdefaultJSONResponse) VisitGetProjectOverviewResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListReviewQueuesRequestObject struct {
 	Project ProjectID `json:"project"`
 	Params  ListReviewQueuesParams
@@ -14814,6 +13681,46 @@ func (response UpdateGatedefaultJSONResponse) VisitUpdateGateResponse(w http.Res
 	return err
 }
 
+type ValidateGateRequestObject struct {
+	Suite SuiteID `json:"suite"`
+	Body  *ValidateGateJSONRequestBody
+}
+
+type ValidateGateResponseObject interface {
+	VisitValidateGateResponse(w http.ResponseWriter) error
+}
+
+type ValidateGate200JSONResponse GateValidateResult
+
+func (response ValidateGate200JSONResponse) VisitValidateGateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ValidateGatedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ValidateGatedefaultJSONResponse) VisitValidateGateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTriggersRequestObject struct {
 	Suite SuiteID `json:"suite"`
 }
@@ -15314,9 +14221,12 @@ type StrictServerInterface interface {
 	// AddExamplesFromResults Promote run results into the dataset draft ("Add to dataset")
 	// (POST /v1/datasets/{dataset}:from-results)
 	AddExamplesFromResults(ctx context.Context, request AddExamplesFromResultsRequestObject) (AddExamplesFromResultsResponseObject, error)
-	// ImportDataset Import examples from CSV/JSONL/JSON/Parquet (upload or URL) or a public Hugging Face dataset, with column mapping. `preview=true` returns parsed rows without writing.
+	// ImportDataset Import examples from CSV/JSONL/JSON/Parquet (multipart upload or inline text) or a public Hugging Face dataset, with column mapping.
 	// (POST /v1/datasets/{dataset}:import)
 	ImportDataset(ctx context.Context, request ImportDatasetRequestObject) (ImportDatasetResponseObject, error)
+	// GetEvaluatorCatalog Every evaluator kind with its category, defaults and config schema (renders the evaluator forms)
+	// (GET /v1/evaluators/catalog)
+	GetEvaluatorCatalog(ctx context.Context, request GetEvaluatorCatalogRequestObject) (GetEvaluatorCatalogResponseObject, error)
 
 	// (DELETE /v1/evaluators/{evaluator})
 	DeleteEvaluator(ctx context.Context, request DeleteEvaluatorRequestObject) (DeleteEvaluatorResponseObject, error)
@@ -15440,6 +14350,9 @@ type StrictServerInterface interface {
 
 	// (POST /v1/projects/{project}/evaluators)
 	CreateEvaluator(ctx context.Context, request CreateEvaluatorRequestObject) (CreateEvaluatorResponseObject, error)
+	// GetProjectOverview Stat tiles for the project overview (runs, latest pass rate, average score, spend, failing gates)
+	// (GET /v1/projects/{project}/overview)
+	GetProjectOverview(ctx context.Context, request GetProjectOverviewRequestObject) (GetProjectOverviewResponseObject, error)
 
 	// (GET /v1/projects/{project}/review-queues)
 	ListReviewQueues(ctx context.Context, request ListReviewQueuesRequestObject) (ListReviewQueuesResponseObject, error)
@@ -15551,6 +14464,9 @@ type StrictServerInterface interface {
 
 	// (PATCH /v1/suites/{suite}/gates/{gate})
 	UpdateGate(ctx context.Context, request UpdateGateRequestObject) (UpdateGateResponseObject, error)
+	// ValidateGate Parse and check a gate (text or AST) against the suite's evaluators without saving (live validation in the gate builder)
+	// (POST /v1/suites/{suite}/gates:validate)
+	ValidateGate(ctx context.Context, request ValidateGateRequestObject) (ValidateGateResponseObject, error)
 
 	// (GET /v1/suites/{suite}/triggers)
 	ListTriggers(ctx context.Context, request ListTriggersRequestObject) (ListTriggersResponseObject, error)
@@ -16312,10 +15228,11 @@ func (sh *strictHandler) AddExamplesFromResults(w http.ResponseWriter, r *http.R
 }
 
 // ImportDataset operation middleware
-func (sh *strictHandler) ImportDataset(w http.ResponseWriter, r *http.Request, dataset DatasetID) {
+func (sh *strictHandler) ImportDataset(w http.ResponseWriter, r *http.Request, dataset DatasetID, params ImportDatasetParams) {
 	var request ImportDatasetRequestObject
 
 	request.Dataset = dataset
+	request.Params = params
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 
 		var body ImportDatasetJSONRequestBody
@@ -16348,6 +15265,30 @@ func (sh *strictHandler) ImportDataset(w http.ResponseWriter, r *http.Request, d
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ImportDatasetResponseObject); ok {
 		if err := validResponse.VisitImportDatasetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEvaluatorCatalog operation middleware
+func (sh *strictHandler) GetEvaluatorCatalog(w http.ResponseWriter, r *http.Request) {
+	var request GetEvaluatorCatalogRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEvaluatorCatalog(ctx, request.(GetEvaluatorCatalogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEvaluatorCatalog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEvaluatorCatalogResponseObject); ok {
+		if err := validResponse.VisitGetEvaluatorCatalogResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -17541,6 +16482,32 @@ func (sh *strictHandler) CreateEvaluator(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// GetProjectOverview operation middleware
+func (sh *strictHandler) GetProjectOverview(w http.ResponseWriter, r *http.Request, project ProjectID) {
+	var request GetProjectOverviewRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetProjectOverview(ctx, request.(GetProjectOverviewRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetProjectOverview")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetProjectOverviewResponseObject); ok {
+		if err := validResponse.VisitGetProjectOverviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListReviewQueues operation middleware
 func (sh *strictHandler) ListReviewQueues(w http.ResponseWriter, r *http.Request, project ProjectID, params ListReviewQueuesParams) {
 	var request ListReviewQueuesRequestObject
@@ -18609,6 +17576,39 @@ func (sh *strictHandler) UpdateGate(w http.ResponseWriter, r *http.Request, suit
 	}
 }
 
+// ValidateGate operation middleware
+func (sh *strictHandler) ValidateGate(w http.ResponseWriter, r *http.Request, suite SuiteID) {
+	var request ValidateGateRequestObject
+
+	request.Suite = suite
+
+	var body ValidateGateJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ValidateGate(ctx, request.(ValidateGateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ValidateGate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ValidateGateResponseObject); ok {
+		if err := validResponse.VisitValidateGateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListTriggers operation middleware
 func (sh *strictHandler) ListTriggers(w http.ResponseWriter, r *http.Request, suite SuiteID) {
 	var request ListTriggersRequestObject
@@ -18903,10 +17903,13 @@ func (sh *strictHandler) TestTarget(w http.ResponseWriter, r *http.Request, targ
 
 	var body TestTargetJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
 	}
-	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.TestTarget(ctx, request.(TestTargetRequestObject))
@@ -18933,264 +17936,310 @@ func (sh *strictHandler) TestTarget(w http.ResponseWriter, r *http.Request, targ
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"UysAVp7oC8zK72ri22ozEzlVeYJip0TG+L8HAA==",
+	"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",
+	"c7U0d/UxkxlY+QZkYAlc+v8fAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

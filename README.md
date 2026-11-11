@@ -18,21 +18,45 @@ make build            # builds web/dist and bin/airval (CGO-free, UI embedded)
 Open http://localhost:8080 and complete the setup screen (first owner + organization).
 `airval dev` generates and persists a secrets master key in `./airval-data/master.key`.
 
-### 2. Docker
+### 2. Install a release binary
 
 ```sh
-docker run -p 8080:8080 -v airval-data:/data -w /data ghcr.io/airval/airval:latest dev
+curl -fsSL https://raw.githubusercontent.com/airval/airval/main/scripts/install.sh | sh   # verifies the checksum
+brew install airval/tap/airval                                                              # or Homebrew
+airval dev
 ```
 
-For production use `deploy/docker/compose.yaml` (Postgres + NATS + server + workers).
-
-### 3. Kubernetes (Helm)
+### 3. Docker
 
 ```sh
-helm install airval deploy/helm/airval \
-  --set secretsMasterKey="$(airval secrets gen-key)" \
-  --set postgresql.external.url=postgres://... --set nats.external.url=nats://...
+docker run -p 8080:8080 -v airval-data:/data ghcr.io/airval/airval:latest dev
 ```
+
+Production-shaped stack (Postgres 17 + NATS JetStream + migrate + server + 2 workers; add `--profile mocktarget` for a
+fake AI service):
+
+```sh
+cd deploy/docker && cp .env.example .env     # set AIRVAL_SECRETS_MASTER_KEY and POSTGRES_PASSWORD
+docker compose up -d --build                 # http://localhost:8080, /readyz reports DB + NATS
+docker compose up -d --scale worker=4
+```
+
+The image is distroless, non-root and read-only-rootfs friendly (state lives in the `/data` volume);
+`/usr/local/bin/airval-probe` is bundled for container healthchecks.
+
+### 4. Kubernetes (Helm)
+
+```sh
+helm dependency build deploy/helm/airval
+helm install airval deploy/helm/airval -n airval --create-namespace \
+  --set postgresql.external.url='postgres://user:pass@db:5432/airval?sslmode=require' \
+  --set config.baseUrl=https://airval.example.com
+helm test airval -n airval
+```
+
+NATS JetStream (3 replicas) is bundled; use `--set nats.enabled=false --set nats.external.url=nats://...` for your own.
+See [`deploy/helm/airval/README.md`](deploy/helm/airval/README.md) for existing Secrets, KEDA autoscaling, Gateway API,
+CloudNativePG and NetworkPolicy options.
 
 ### Server + worker (production)
 
@@ -53,6 +77,17 @@ Optional first-boot admin (Helm-friendly): `AIRVAL_BOOTSTRAP_ADMIN_EMAIL`, `AIRV
 ```sh
 AIRVAL_URL=https://airval.example.com AIRVAL_API_KEY=airv_... \
   airval run --suite <suite-id> --label git_sha=$GITHUB_SHA --gate
+```
+
+On GitHub Actions use the bundled composite action, which also posts/updates a PR comment:
+
+```yaml
+- uses: airval/airval/.github/actions/airval-run@main
+  with:
+    server-url: https://airval.example.com
+    api-key: ${{ secrets.AIRVAL_API_KEY }}
+    suite: my-suite
+    project: <project-id>
 ```
 
 ## Configuration
