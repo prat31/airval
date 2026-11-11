@@ -445,6 +445,25 @@ export interface paths {
         patch: operations["updateProject"];
         trace?: never;
     };
+    "/v1/projects/{project}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: components["parameters"]["ProjectID"];
+            };
+            cookie?: never;
+        };
+        /** Stat tiles for the project overview (runs, latest pass rate, average score, spend, failing gates) */
+        get: operations["getProjectOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects/{project}/trends": {
         parameters: {
             query?: never;
@@ -549,7 +568,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send one example to the target ("Test connection") and show raw request/response with mapping applied */
+        /**
+         * Send one example to the target ("Test connection") and show raw request/response with mapping applied
+         * @description Uses `example`, else the first example of `dataset_id`, else a built-in sample. Secrets are resolved server-side and redacted in the report.
+         */
         post: operations["testTarget"];
         delete?: never;
         options?: never;
@@ -681,7 +703,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import examples from CSV/JSONL/JSON/Parquet (upload or URL) or a public Hugging Face dataset, with column mapping. `preview=true` returns parsed rows without writing. */
+        /**
+         * Import examples from CSV/JSONL/JSON/Parquet (multipart upload or inline text) or a public Hugging Face dataset, with column mapping.
+         * @description Two phases. `?preview=true` parses the first rows without writing and returns `source_preview` (columns, inferred
+         *     types, sample rows) plus a `suggested_mapping`; when a `mapping` is also sent, `preview` holds the mapped examples.
+         *     Without `preview`, the source is streamed in batches into the dataset draft (`mode: replace` clears the draft first)
+         *     and the result carries the counts; `publish: true` also publishes a version. Uploads are limited by
+         *     `server.max_upload_mb`. To commit an upload, send the same file again with the mapping in `options`.
+         */
         post: operations["importDataset"];
         delete?: never;
         options?: never;
@@ -802,6 +831,23 @@ export interface paths {
         patch: operations["updateEvaluator"];
         trace?: never;
     };
+    "/v1/evaluators/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every evaluator kind with its category, defaults and config schema (renders the evaluator forms) */
+        get: operations["getEvaluatorCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evaluators/{evaluator}/agreement": {
         parameters: {
             query?: never;
@@ -905,6 +951,25 @@ export interface paths {
         get: operations["listGates"];
         put?: never;
         post: operations["createGate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/suites/{suite}/gates:validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suite: components["parameters"]["SuiteID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Parse and check a gate (text or AST) against the suite's evaluators without saving (live validation in the gate builder) */
+        post: operations["validateGate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1161,7 +1226,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Compare 2–4 runs (first run is the baseline) */
+        /**
+         * Compare 2–4 runs (first run is the baseline)
+         * @description Scorecard cells carry deltas vs the baseline with a paired bootstrap confidence interval; `regressions` and
+         *     `improvements` are ranked per-example deltas for the chosen evaluator (paginate with `offset`/`limit`, totals in
+         *     `regressions_total`/`improvements_total`); `rows` aligns every example's score across all runs (most changed first).
+         */
         get: operations["compareRuns"];
         put?: never;
         post?: never;
@@ -1664,23 +1734,13 @@ export interface components {
         /** @enum {string} */
         TargetKind: "http" | "openai" | "anthropic" | "bedrock" | "vertex" | "agent";
         /**
-         * @description Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
-         *     Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
+         * @description Versioned target configuration, flat and specific to `kind` (see HttpTargetConfig, OpenAITargetConfig,
+         *     AnthropicTargetConfig, BedrockTargetConfig, VertexTargetConfig; `agent` takes the HttpTargetConfig fields and needs
+         *     a `response.trace` or `response.tool_calls` mapping). The server validates it strictly on create/update
+         *     (unknown fields are rejected) and returns 400 `validation_failed` with `details.field`.
+         *     Strings are Go templates: `{{ .input.question }}`, `{{ secret "KEY" }}`. Secret values never appear in test output.
          */
         TargetConfig: {
-            http?: components["schemas"]["HttpTargetConfig"];
-            openai?: components["schemas"]["OpenAITargetConfig"];
-            anthropic?: components["schemas"]["AnthropicTargetConfig"];
-            bedrock?: components["schemas"]["BedrockTargetConfig"];
-            vertex?: components["schemas"]["VertexTargetConfig"];
-            conversation?: components["schemas"]["ConversationConfig"];
-            limits?: components["schemas"]["TargetLimits"];
-            cache?: components["schemas"]["CachePolicy"];
-            /** @description Default template variables (overridable per run / by webhooks) */
-            variables?: {
-                [key: string]: string;
-            };
-        } & {
             [key: string]: unknown;
         };
         HttpTargetConfig: {
@@ -1688,29 +1748,32 @@ export interface components {
              * @default POST
              * @enum {string}
              */
-            method: "GET" | "POST" | "PUT" | "PATCH";
+            method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
             url: string;
             headers?: {
                 [key: string]: string;
             };
-            query?: {
-                [key: string]: string;
-            };
             /** @description Request body template (usually JSON) */
             body?: string;
-            /**
-             * @default none
-             * @enum {string}
-             */
-            streaming: "none" | "sse" | "ndjson";
+            /** @description Accepted status codes (default any 2xx) */
+            expect_status?: number[];
+            response?: components["schemas"]["ResponseMapping"];
+            stream?: {
+                /** @enum {string} */
+                mode: "sse" | "ndjson";
+                delta_path: string;
+                done_sentinel?: string;
+                event?: string;
+            };
+            session?: {
+                path: string;
+            };
             /** @default 60000 */
             timeout_ms: number;
-            /** @default 2 */
-            retries: number;
-            response?: components["schemas"]["ResponseMapping"];
+            /** Format: int64 */
+            max_response_bytes?: number;
+            max_concurrency?: number;
             tls?: components["schemas"]["TLSConfig"];
-        } & {
-            [key: string]: unknown;
         };
         /** @description JSONPath expressions applied to the response body */
         ResponseMapping: {
@@ -1719,80 +1782,108 @@ export interface components {
             output_json?: string;
             /** @description Path to an array of retrieved passages */
             context?: string;
-            tool_calls?: string;
-            /** @description agent: path to intermediate steps */
-            trace?: string;
-            usage_input_tokens?: string;
-            usage_output_tokens?: string;
+            tool_calls?: {
+                path: string;
+                id?: string;
+                name?: string;
+                arguments?: string;
+                result?: string;
+            };
+            trace?: {
+                path: string;
+                kind?: string;
+                name?: string;
+                input?: string;
+                output?: string;
+                duration_ms?: string;
+            };
+            input_tokens?: string;
+            output_tokens?: string;
             cost_usd?: string;
-            /** @description Multi-turn session id to feed back */
-            session_id?: string;
-            /** @description Path of the text delta inside each SSE/NDJSON chunk */
-            stream_delta?: string;
-        } & {
-            [key: string]: unknown;
         };
+        /** @description PEM fields are templates, e.g. `{{ secret "CLIENT_CERT" }}` */
         TLSConfig: {
+            ca_cert?: string;
+            client_cert?: string;
+            client_key?: string;
+            server_name?: string;
             insecure_skip_verify?: boolean;
-            ca_cert_secret?: string;
-            client_cert_secret?: string;
-            client_key_secret?: string;
-        } & {
-            [key: string]: unknown;
         };
         LLMSamplingConfig: {
-            model?: string;
+            model: string;
             system_prompt?: string;
-            /** @description User message template (default: {{ .input.input }} or the JSON of input) */
-            prompt_template?: string;
+            /** @description User message template (default: the lone string in the input, else its JSON) */
+            user_template?: string;
             /** Format: double */
             temperature?: number;
             max_tokens?: number;
-            /** Format: double */
-            top_p?: number;
-            tools?: components["schemas"]["JSONObject"][];
-            json_mode?: boolean;
-            extra_body?: components["schemas"]["JSONObject"];
-        } & {
-            [key: string]: unknown;
+            pricing?: {
+                /** Format: double */
+                input_per_1m?: number;
+                /** Format: double */
+                output_per_1m?: number;
+            };
+            timeout_ms?: number;
+            /** Format: int64 */
+            max_response_bytes?: number;
+            max_concurrency?: number;
+            tls?: components["schemas"]["TLSConfig"];
         };
-        OpenAITargetConfig: components["schemas"]["LLMSamplingConfig"] & ({
+        OpenAITargetConfig: components["schemas"]["LLMSamplingConfig"] & {
             /** @default https://api.openai.com/v1 */
             base_url: string;
-            api_key_secret?: string;
-            organization?: string;
-            /** @description Azure OpenAI api-version */
-            api_version?: string;
-            /** @description Azure OpenAI deployment */
-            deployment?: string;
-        } & {
-            [key: string]: unknown;
-        });
-        AnthropicTargetConfig: components["schemas"]["LLMSamplingConfig"] & ({
+            /** @default /chat/completions */
+            path: string;
+            /** @description Template, e.g. {{ secret "OPENAI_KEY" }} */
+            api_key?: string;
+            auth_header?: string;
+            headers?: {
+                [key: string]: string;
+            };
+            query?: {
+                [key: string]: string;
+            };
+            max_tokens_param?: string;
+            tools?: components["schemas"]["JSONObject"][];
+            tool_choice?: components["schemas"]["JSONValue"];
+            response_format?: components["schemas"]["JSONObject"];
+            extra_body?: components["schemas"]["JSONObject"];
+            stream?: boolean;
+        };
+        AnthropicTargetConfig: components["schemas"]["LLMSamplingConfig"] & {
             /** @default https://api.anthropic.com */
             base_url: string;
-            api_key_secret?: string;
+            api_key?: string;
             anthropic_version?: string;
-        } & {
-            [key: string]: unknown;
-        });
-        BedrockTargetConfig: components["schemas"]["LLMSamplingConfig"] & ({
-            region?: string;
-            model_id?: string;
-            access_key_id_secret?: string;
-            secret_access_key_secret?: string;
-            session_token_secret?: string;
-        } & {
-            [key: string]: unknown;
-        });
-        VertexTargetConfig: components["schemas"]["LLMSamplingConfig"] & ({
-            project?: string;
+            anthropic_beta?: string;
+            headers?: {
+                [key: string]: string;
+            };
+            tools?: components["schemas"]["JSONObject"][];
+            tool_choice?: components["schemas"]["JSONValue"];
+            extra_body?: components["schemas"]["JSONObject"];
+            stream?: boolean;
+        };
+        BedrockTargetConfig: components["schemas"]["LLMSamplingConfig"] & {
+            region: string;
+            endpoint?: string;
+            access_key_id: string;
+            secret_access_key: string;
+            session_token?: string;
+            tool_config?: components["schemas"]["JSONObject"];
+            additional_model_request_fields?: components["schemas"]["JSONObject"];
+            extra_body?: components["schemas"]["JSONObject"];
+        };
+        VertexTargetConfig: components["schemas"]["LLMSamplingConfig"] & {
+            base_url?: string;
+            /** @description Set for Vertex AI; omit for the Gemini API */
+            project_id?: string;
             location?: string;
-            /** @description Service account JSON */
-            credentials_secret?: string;
-        } & {
-            [key: string]: unknown;
-        });
+            api_key?: string;
+            access_token?: string;
+            tools?: components["schemas"]["JSONObject"][];
+            extra_body?: components["schemas"]["JSONObject"];
+        };
         /** @description How multi-turn state is carried between turns */
         ConversationConfig: {
             /**
@@ -1878,6 +1969,11 @@ export interface components {
         };
         TargetTestRequest: {
             example?: components["schemas"]["ExampleData"];
+            /**
+             * Format: uuid
+             * @description Use the first example of this dataset (draft) as the sample
+             */
+            dataset_id?: string;
             variables?: {
                 [key: string]: string;
             };
@@ -1886,6 +1982,8 @@ export interface components {
             kind: components["schemas"]["TargetKind"];
             config: components["schemas"]["TargetConfig"];
             example?: components["schemas"]["ExampleData"];
+            /** Format: uuid */
+            dataset_id?: string;
             variables?: {
                 [key: string]: string;
             };
@@ -1893,10 +1991,23 @@ export interface components {
         TargetTestResult: {
             ok: boolean;
             error?: string;
+            /** @description permanent | transient | rate_limited | ... (empty when ok) */
+            error_class?: string;
+            /** Format: int64 */
+            retry_after_ms?: number;
+            /** Format: double */
+            latency_ms: number;
             request?: components["schemas"]["JSONValue"];
             raw_response?: components["schemas"]["JSONValue"];
             status_code?: number;
             response?: components["schemas"]["TargetResponse"];
+            /** @description One row per configured response JSONPath, showing whether it matched */
+            mapping?: {
+                field: string;
+                path: string;
+                matched: boolean;
+                value?: components["schemas"]["JSONValue"];
+            }[];
         };
         /** @description What a target returned for one example (mirrors the execution pipeline's Response) */
         TargetResponse: {
@@ -2071,23 +2182,28 @@ export interface components {
         };
         /** @enum {string} */
         DatasetImportFormat: "csv" | "jsonl" | "json" | "parquet";
-        /** @description Maps source columns to example fields. Unmapped columns go to metadata when `rest_to_metadata`. */
+        /** @description Maps source columns to example fields (the importer's mapping, verbatim). */
         ColumnMapping: {
-            /** @description Columns that become input fields (name preserved) */
-            input?: string[];
-            expected?: string;
-            context?: string;
-            metadata?: string[];
-            /** @description Column with comma-separated tags */
-            tags?: string;
-            conversation?: string;
-            rest_to_metadata?: boolean;
+            /** @description source column -> input key */
+            input_columns?: {
+                [key: string]: string;
+            };
+            /** @description Put every column not mapped elsewhere into input */
+            whole_row_as_input?: boolean;
+            id_column?: string;
+            expected_column?: string;
+            context_column?: string;
+            context_delimiter?: string;
+            tags_column?: string;
+            tags_delimiter?: string;
+            metadata_columns?: string[];
+            /** @description OpenAI-style messages array */
+            conversation_column?: string;
         };
         DatasetImportRequest: {
             source?: {
                 /** @enum {string} */
-                kind?: "upload" | "url" | "huggingface" | "inline";
-                url?: string;
+                kind?: "upload" | "huggingface" | "inline";
                 format?: components["schemas"]["DatasetImportFormat"];
                 /** @description inline: pasted CSV/JSONL/JSON */
                 data?: string;
@@ -2096,6 +2212,7 @@ export interface components {
                 hf_config?: string;
                 /** @default train */
                 hf_split: string;
+                /** @description Import at most this many rows */
                 limit?: number;
             };
             mapping?: components["schemas"]["ColumnMapping"];
@@ -2106,20 +2223,47 @@ export interface components {
             mode: "append" | "replace";
             /** @description Tags added to every imported example */
             tags?: string[];
-            /** @description Parse and return up to 20 mapped rows without writing */
+            /** @description Same as the `preview` query parameter */
             preview?: boolean;
             /** @description Publish a version after importing */
             publish?: boolean;
         };
+        DatasetPreview: {
+            format: string;
+            columns: {
+                name: string;
+                /** @description string|int|float|bool|array|object|messages|null */
+                inferred_type: string;
+                sample_values: components["schemas"]["JSONValue"][];
+            }[];
+            /** @description Aligned with columns */
+            rows: components["schemas"]["JSONValue"][][];
+            /**
+             * Format: int64
+             * @description -1 when unknown
+             */
+            total_estimate: number;
+            total_exact: boolean;
+            row_errors?: components["schemas"]["ImportRowError"][];
+        };
+        ImportRowError: {
+            row: number;
+            message: string;
+        };
         DatasetImportResult: {
             /** @description Examples written (0 for preview) */
             count: number;
+            /** @description Source rows read */
+            total: number;
+            /** @description Rows skipped */
+            failed: number;
             columns?: string[];
+            /** @description Mapped examples (preview with a mapping) */
             preview?: components["schemas"]["ExampleData"][];
-            errors?: {
-                row: number;
-                message: string;
-            }[];
+            source_preview?: components["schemas"]["DatasetPreview"];
+            suggested_mapping?: components["schemas"]["ColumnMapping"];
+            errors?: components["schemas"]["ImportRowError"][];
+            errors_truncated?: boolean;
             version?: components["schemas"]["DatasetVersion"];
         };
         DatasetVersion: {
@@ -2146,7 +2290,7 @@ export interface components {
         EvaluatorKind: "equals" | "contains" | "regex" | "starts_with" | "ends_with" | "is_json" | "json_schema" | "jsonpath_equals" | "numeric_close" | "levenshtein" | "rouge_l" | "bleu" | "length" | "latency_ms" | "cost_usd" | "tokens" | "tool_called" | "tool_sequence" | "no_pii" | "refusal" | "embedding_similarity" | "llm_rubric" | "correctness" | "faithfulness" | "groundedness" | "answer_relevance" | "context_relevance" | "context_recall" | "hallucination" | "toxicity" | "bias" | "conciseness" | "helpfulness" | "conversation_goal_completion" | "conversation_coherence" | "tool_use_correctness" | "pairwise" | "human";
         /** @enum {string} */
         EvaluatorCategory: "deterministic" | "model" | "human";
-        /** @description Kind-specific options. Only the fields relevant to the kind are used. */
+        /** @description Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative. */
         EvaluatorConfig: {
             /** @description What to score: output (default), output_json, context, transcript, or a JSONPath into the output */
             field?: string;
@@ -2263,17 +2407,61 @@ export interface components {
             example?: components["schemas"]["ExampleData"];
             response: components["schemas"]["TargetResponse"];
         };
+        EvaluatorCatalog: {
+            items: components["schemas"]["EvaluatorKindInfo"][];
+        };
+        EvaluatorKindInfo: {
+            kind: string;
+            name: string;
+            /** @enum {string} */
+            category: "deterministic" | "model" | "human";
+            group: string;
+            description: string;
+            /** @description free | cheap | moderate | expensive */
+            cost: string;
+            /** Format: double */
+            default_threshold: number;
+            config_schema: components["schemas"]["JSONObject"];
+            apply_to: components["schemas"]["ApplyTo"][];
+            requires?: string[];
+            prompt_version?: string;
+            /** @description Judge prompt template shown to users */
+            prompt?: string;
+        };
         EvaluatorAgreement: {
             /** Format: uuid */
             evaluator_id: string;
             /** @description Results with both a score and a human annotation */
             n: number;
-            /** Format: double */
+            /** @description Pairs with a pass/fail verdict on both sides */
+            n_binary?: number;
+            /** @description Pairs with a numeric value on both sides */
+            n_numeric?: number;
+            /**
+             * Format: double
+             * @description Over pass/fail verdicts
+             */
             cohens_kappa?: number | null;
             /** Format: double */
             percent_agreement?: number | null;
+            /**
+             * Format: double
+             * @description Over numeric values
+             */
+            pearson?: number | null;
             /** Format: double */
             mean_abs_error?: number | null;
+            /** Format: double */
+            judge_pass_rate?: number | null;
+            /** Format: double */
+            human_pass_rate?: number | null;
+            /** @description Human verdict (rows) vs evaluator verdict (columns), pass = positive */
+            confusion?: {
+                tp?: number;
+                fp?: number;
+                fn?: number;
+                tn?: number;
+            };
         };
         /** @enum {string} */
         Severity: "critical" | "major" | "minor";
@@ -2397,27 +2585,23 @@ export interface components {
             baseline_run_id?: string | null;
         };
         /**
-         * @description Gate expression AST. Logical nodes (`and`, `or`, `not`) have `args`; `compare` nodes compute
-         *     `fn(metric[, evaluator][, selector][, tag]) comparator value`. Examples:
-         *     mean(faithfulness) >= 0.85 → {op:compare, fn:mean, metric:evaluator, evaluator_id, comparator:">=", value:0.85};
-         *     count(critical_fail) == 0 → {op:compare, fn:count, metric:results, selector:critical_fail, comparator:"==", value:0}.
+         * @description Gate expression AST (same tree the text form parses to). Logical nodes `and`/`or` (2+ `args`) and `not` (1 arg);
+         *     `cmp` has `cmp` (>=, >, <=, <, ==, !=) and two `args` (calls or numbers); `call` has `func` and `params`;
+         *     `num` has `value`. Evaluators are referenced by their id (a UUID) in the stored AST; clients may send the
+         *     evaluator name or slug and the server rewrites it. Example for
+         *     `mean(faithfulness) >= 0.85 and count(critical_fail) == 0`:
+         *     {op:and,args:[{op:cmp,cmp:">=",args:[{op:call,func:mean,params:[<evaluator id>]},{op:num,value:0.85}]},
+         *     {op:cmp,cmp:"==",args:[{op:call,func:count,params:[critical_fail]},{op:num,value:0}]}]}.
          */
         GateExpr: {
             /** @enum {string} */
-            op: "and" | "or" | "not" | "compare";
+            op: "and" | "or" | "not" | "cmp" | "call" | "num";
             args?: components["schemas"]["GateExpr"][];
             /** @enum {string} */
-            fn?: "mean" | "pass_rate" | "count" | "sum" | "min" | "max" | "stddev" | "p50" | "p90" | "p95" | "p99" | "regression_vs_baseline";
+            cmp?: ">=" | ">" | "<=" | "<" | "==" | "!=";
             /** @enum {string} */
-            metric?: "evaluator" | "results" | "latency_ms" | "ttft_ms" | "cost_usd" | "tokens";
-            /** Format: uuid */
-            evaluator_id?: string;
-            /** @enum {string} */
-            selector?: "all" | "passed" | "failed" | "errored" | "critical_fail" | "major_fail" | "minor_fail";
-            /** @description Restrict to examples with this tag */
-            tag?: string;
-            /** @enum {string} */
-            comparator?: ">=" | ">" | "<=" | "<" | "==" | "!=";
+            func?: "mean" | "median" | "p50" | "p90" | "p95" | "p99" | "min" | "max" | "stddev" | "sum" | "pass_rate" | "count" | "regression_vs_baseline";
+            params?: string[];
             /** Format: double */
             value?: number;
         };
@@ -2439,14 +2623,33 @@ export interface components {
         GateList: {
             items: components["schemas"]["Gate"][];
         };
+        /** @description Send `text` (e.g. `mean(faithfulness) >= 0.85`) or `expr` (the AST); exactly one. */
         GateCreate: {
             name?: string;
-            expr: components["schemas"]["GateExpr"];
+            text?: string;
+            expr?: components["schemas"]["GateExpr"];
             /** @default true */
             enabled: boolean;
         };
+        GateValidateRequest: {
+            text?: string;
+            expr?: components["schemas"]["GateExpr"];
+        };
+        GateValidateResult: {
+            ok: boolean;
+            expr?: components["schemas"]["GateExpr"];
+            /** @description Canonical rendering */
+            text?: string;
+            /** @description Evaluator names the expression references */
+            evaluators?: string[];
+            error?: string;
+            /** @description Character offset of a text parse error (0-based) */
+            position?: number;
+            suggestion?: string;
+        };
         GateUpdate: {
             name?: string;
+            text?: string;
             expr?: components["schemas"]["GateExpr"];
             enabled?: boolean;
         };
@@ -2747,6 +2950,41 @@ export interface components {
             at: string;
             data?: components["schemas"]["JSONObject"];
         };
+        ProjectOverview: {
+            /** @description Runs created in the last 7 days */
+            runs_7d: number;
+            /** @description Runs created in the 7 days before that */
+            runs_prev_7d: number;
+            latest_run?: components["schemas"]["Run"];
+            /**
+             * Format: double
+             * @description Pass rate of the latest finished run (0..1)
+             */
+            latest_pass_rate?: number | null;
+            /**
+             * Format: double
+             * @description Change vs the previous finished run of the same suite
+             */
+            pass_rate_delta?: number | null;
+            /**
+             * Format: double
+             * @description Mean of the latest finished run's evaluator means
+             */
+            avg_score?: number | null;
+            /** Format: double */
+            spend_7d_usd: number;
+            /** Format: double */
+            spend_prev_7d_usd?: number;
+            /** @description Suites whose latest finished run failed its gate */
+            failing_gates: number;
+            failing_suites?: {
+                /** Format: uuid */
+                suite_id: string;
+                name?: string;
+                /** Format: uuid */
+                run_id: string;
+            }[];
+        };
         /** @enum {string} */
         TrendMetric: "pass_rate" | "score_mean" | "latency_p50" | "latency_p95" | "cost_usd" | "tokens";
         TrendPoint: {
@@ -2808,6 +3046,19 @@ export interface components {
             delta_mean?: number | null;
             /** Format: double */
             delta_pass_rate?: number | null;
+            /**
+             * Format: double
+             * @description Paired bootstrap interval of the mean delta
+             */
+            ci_low?: number | null;
+            /** Format: double */
+            ci_high?: number | null;
+            /** Format: double */
+            p_value?: number | null;
+            /** @description The interval excludes zero */
+            significant?: boolean;
+            /** @description Examples scored in both this run and the baseline */
+            paired?: number;
         };
         ScorecardRow: {
             /** @description evaluator id or a run-level metric ("latency_p95", "cost_usd") */
@@ -2827,25 +3078,26 @@ export interface components {
             passed?: boolean | null;
             output?: string;
         };
-        ExampleDelta: {
-            /** Format: uuid */
-            example_id: string;
-            input?: components["schemas"]["JSONObject"];
-            expected?: components["schemas"]["JSONValue"];
-            /**
-             * Format: double
-             * @description Last run's score minus the first run's
-             */
-            delta: number;
-            cells: components["schemas"]["ExampleDeltaCell"][];
-        };
         ComparisonReport: {
             runs: components["schemas"]["Run"][];
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Evaluator used for regressions
+             */
             evaluator_id?: string;
+            /** @description Evaluators present in the baseline and at least one other run */
+            evaluators?: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+            /** Format: uuid */
+            against_run_id?: string;
             scorecard: components["schemas"]["ScorecardRow"][];
             regressions: components["schemas"]["ExampleDelta"][];
+            regressions_total?: number;
             improvements: components["schemas"]["ExampleDelta"][];
+            improvements_total?: number;
             scatter?: {
                 /** Format: uuid */
                 example_id: string;
@@ -2854,11 +3106,48 @@ export interface components {
                 /** Format: double */
                 b: number;
             }[];
-            pairwise?: {
-                wins?: number;
-                ties?: number;
-                losses?: number;
-            };
+            rows?: components["schemas"]["ComparisonRow"][];
+            rows_total?: number;
+            /** @description Win rate of each pairwise-scored run */
+            pairwise?: components["schemas"]["PairwiseSummary"][];
+        };
+        ExampleDelta: {
+            /** Format: uuid */
+            example_id: string;
+            input_preview?: string;
+            /** Format: double */
+            baseline: number;
+            /** Format: double */
+            candidate: number;
+            /** Format: double */
+            delta: number;
+            baseline_passed?: boolean | null;
+            candidate_passed?: boolean | null;
+        };
+        ComparisonRow: {
+            /** Format: uuid */
+            example_id: string;
+            input_preview?: string;
+            /** @description One per compared run, same order as `runs`; absent value = example not scored in that run */
+            cells: {
+                /** Format: uuid */
+                run_id: string;
+                /** Format: double */
+                value?: number | null;
+                passed?: boolean | null;
+            }[];
+        };
+        PairwiseSummary: {
+            /** Format: uuid */
+            run_id: string;
+            wins: number;
+            ties: number;
+            losses: number;
+            /**
+             * Format: double
+             * @description (wins + ties/2) / decided
+             */
+            win_rate: number;
         };
         ReviewQueueConfig: {
             /**
@@ -4059,6 +4348,29 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    getProjectOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: components["parameters"]["ProjectID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectOverview"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     getTrends: {
         parameters: {
             query?: {
@@ -4275,7 +4587,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": components["schemas"]["TargetTestRequest"];
             };
@@ -4557,7 +4869,9 @@ export interface operations {
     };
     importDataset: {
         parameters: {
-            query?: never;
+            query?: {
+                preview?: boolean;
+            };
             header?: never;
             path: {
                 dataset: components["parameters"]["DatasetID"];
@@ -4570,7 +4884,7 @@ export interface operations {
                 "multipart/form-data": {
                     /** Format: binary */
                     file: string;
-                    /** @description JSON-encoded DatasetImportRequest (without source.url/hf) */
+                    /** @description JSON-encoded DatasetImportRequest (mapping, mode, tags, publish, source.format/limit) */
                     options?: string;
                 };
             };
@@ -4845,6 +5159,27 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    getEvaluatorCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluatorCatalog"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     getEvaluatorAgreement: {
         parameters: {
             query?: never;
@@ -5087,6 +5422,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Gate"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    validateGate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suite: components["parameters"]["SuiteID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GateValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GateValidateResult"];
                 };
             };
             default: components["responses"]["Error"];
@@ -5588,8 +5950,12 @@ export interface operations {
                 runs: string[];
                 /** @description Evaluator used to rank regressions (default first common) */
                 evaluator_id?: string;
-                /** @description Max regressions/improvements returned */
+                /** @description Run (one of `runs`) whose regressions/improvements and scatter are listed against the baseline (default the second run) */
+                against?: string;
+                /** @description Page size for regressions/improvements/rows */
                 limit?: number;
+                /** @description Offset into the ranked regressions/improvements/rows lists */
+                offset?: number;
             };
             header?: never;
             path?: never;
