@@ -471,9 +471,9 @@ func TestPairwiseVoting(t *testing.T) {
 
 func TestMajority(t *testing.T) {
 	cases := map[string][]string{
-		"A":   {"A", "A", "B"},
-		"B":   {"B"},
-		"tie": {"A", "B"},
+		"A":    {"A", "A", "B"},
+		"B":    {"B"},
+		"tie":  {"A", "B"},
 		"tie ": {"tie", "tie", "A"},
 	}
 	for want, in := range cases {
