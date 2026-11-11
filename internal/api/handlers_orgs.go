@@ -307,7 +307,17 @@ func (s *Server) ListAuditLog(ctx context.Context, req gen.ListAuditLogRequestOb
 	if err := s.require(ctx, req.Org, nil, store.RoleAdmin); err != nil {
 		return nil, err
 	}
-	pg, err := s.Store.ListAudit(ctx, req.Org, listParams(req.Params.Cursor, req.Params.Limit))
+	f := store.AuditFilter{OrgID: req.Org, From: req.Params.From, To: req.Params.To}
+	if v := req.Params.Actor; v != nil {
+		f.Actor = strings.TrimSpace(*v)
+	}
+	if v := req.Params.Action; v != nil {
+		f.Action = strings.TrimSpace(*v)
+	}
+	if v := req.Params.Target; v != nil {
+		f.Target = strings.TrimSpace(*v)
+	}
+	pg, err := s.Store.ListAudit(ctx, f, listParams(req.Params.Cursor, req.Params.Limit))
 	if err != nil {
 		return nil, err
 	}

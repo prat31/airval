@@ -29,10 +29,16 @@ var (
 // Override lets ee adjust the effective role (e.g. per-project roles). It returns ok=false to keep the core role.
 type Override func(ctx context.Context, p *auth.Principal, orgID uuid.UUID, projectID *uuid.UUID, base store.Role) (store.Role, bool, error)
 
+// Decider lets ee replace the minimum-role check with its own decision (custom roles with fine-grained
+// permissions). It sees the caller's effective role and, via ScopeFrom(ctx), the operation being served.
+// It returns handled=false to fall back to the core rule (role.AtLeast(min)).
+type Decider func(ctx context.Context, p *auth.Principal, orgID uuid.UUID, projectID *uuid.UUID, role, min store.Role) (allowed, handled bool, err error)
+
 // Authorizer answers access questions.
 type Authorizer struct {
 	Store    store.OrgStore
 	Override Override
+	Decider  Decider
 }
 
 // Role returns the caller's effective role for orgID (and optionally projectID).
@@ -69,6 +75,9 @@ func (a *Authorizer) Role(ctx context.Context, p *auth.Principal, orgID uuid.UUI
 			role = r
 		}
 	}
+	if sc := ScopeFrom(ctx); sc != nil {
+		sc.record(orgID, projectID)
+	}
 	return role, nil
 }
 
@@ -77,6 +86,18 @@ func (a *Authorizer) Require(ctx context.Context, p *auth.Principal, orgID uuid.
 	role, err := a.Role(ctx, p, orgID, projectID)
 	if err != nil {
 		return err
+	}
+	if a.Decider != nil {
+		allowed, handled, err := a.Decider(ctx, p, orgID, projectID, role, min)
+		if err != nil {
+			return err
+		}
+		if handled {
+			if !allowed {
+				return ErrForbidden
+			}
+			return nil
+		}
 	}
 	if !role.AtLeast(min) {
 		return ErrForbidden

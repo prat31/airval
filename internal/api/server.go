@@ -21,6 +21,7 @@ import (
 	"github.com/prat31/airval/internal/api/gen"
 	"github.com/prat31/airval/internal/auth"
 	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/ext"
 	"github.com/prat31/airval/internal/queue"
 	"github.com/prat31/airval/internal/rbac"
 	"github.com/prat31/airval/internal/secrets"
@@ -56,6 +57,10 @@ type Server struct {
 	auditSinks   []func(context.Context, store.AuditEntry)
 	ssoProviders []string
 	extRoutes    []func(chi.Router)
+	// ee hooks (see ext.go)
+	authProviders ext.AuthProvidersFunc
+	features      []string
+	observers     []ext.CallObserver
 }
 
 var _ gen.StrictServerInterface = (*Server)(nil)
@@ -97,10 +102,12 @@ func (s *Server) AddRoutes(f func(chi.Router)) {
 
 // publicOps don't require authentication.
 var publicOps = map[string]bool{
-	"GetMeta":        true,
-	"GetSetupStatus": true,
-	"CompleteSetup":  true,
-	"Login":          true,
+	"GetMeta":           true,
+	"GetEdition":        true,
+	"ListAuthProviders": true,
+	"GetSetupStatus":    true,
+	"CompleteSetup":     true,
+	"Login":             true,
 }
 
 // Handler builds the full HTTP handler.
@@ -120,6 +127,7 @@ func (s *Server) Handler() http.Handler {
 	// SSO is an ee feature; core answers 501 unless an extension registers these routes.
 	r.Get("/v1/auth/oidc/{provider}/start", s.handleOIDCNotAvailable)
 	r.Get("/v1/auth/oidc/{provider}/callback", s.handleOIDCNotAvailable)
+	s.eeRoutes(r)
 	s.mu.RLock()
 	for _, f := range s.extRoutes {
 		f(r)
@@ -182,7 +190,8 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 				// A stale cookie shouldn't block public endpoints like login: clear it and continue anonymously.
 				if r.Header.Get("Authorization") == "" {
 					s.Auth.ClearSessionCookies(w)
-					next.ServeHTTP(w, r.WithContext(withRequestInfo(r.Context(), r)))
+					ctx, sc := rbac.WithScope(withRequestInfo(r.Context(), r))
+					s.observe(w, r.WithContext(ctx), sc, next)
 					return
 				}
 			}
@@ -193,17 +202,18 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			s.writeError(w, r, err)
 			return
 		}
-		ctx := withRequestInfo(r.Context(), r)
+		ctx, sc := rbac.WithScope(withRequestInfo(r.Context(), r))
 		if p != nil {
 			ctx = auth.WithPrincipal(ctx, p)
 		}
-		next.ServeHTTP(w, r.WithContext(ctx))
+		s.observe(w, r.WithContext(ctx), sc, next)
 	})
 }
 
 // requireAuth rejects anonymous calls to non-public operations.
 func (s *Server) requireAuth(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (any, error) {
+		rbac.ScopeFrom(ctx).SetOperation(operationID)
 		if !publicOps[operationID] && auth.FromContext(ctx) == nil {
 			return nil, rbac.ErrUnauthenticated
 		}
@@ -297,7 +307,10 @@ func (s *Server) project(ctx context.Context, id uuid.UUID, min store.Role) (sto
 // audit records a security-relevant action (stored in core; ee sinks may forward it).
 func (s *Server) audit(ctx context.Context, orgID uuid.UUID, action, target string, diff any) {
 	p := s.principal(ctx)
-	e := store.AuditEntry{OrgID: orgID, ActorID: p.UserID(), Actor: p.Actor(), Action: action, Target: target}
+	ri := requestInfo(ctx)
+	e := store.AuditEntry{OrgID: orgID, ActorID: p.UserID(), Actor: p.Actor(), Action: action, Target: target,
+		IP: clientIP(ri.IP), UserAgent: ri.UserAgent, RequestID: ri.RequestID}
+	rbac.ScopeFrom(ctx).MarkAudited()
 	if diff != nil {
 		e.Diff = mustJSON(diff)
 	}

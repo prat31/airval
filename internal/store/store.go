@@ -152,6 +152,7 @@ type Store interface {
 	CacheStore
 	EngineStore
 	InsightStore
+	EnterpriseStore
 
 	// WithTx runs fn in a transaction. Nested calls reuse the outer transaction.
 	WithTx(ctx context.Context, fn func(tx Store) error) error
@@ -372,7 +373,7 @@ type NotificationStore interface {
 
 type AuditStore interface {
 	AppendAudit(ctx context.Context, e *AuditEntry) error
-	ListAudit(ctx context.Context, orgID uuid.UUID, p ListParams) (Page[AuditEntry], error)
+	ListAudit(ctx context.Context, f AuditFilter, p ListParams) (Page[AuditEntry], error)
 }
 
 type CacheStore interface {

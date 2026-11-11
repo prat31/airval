@@ -50,9 +50,10 @@ type App struct {
 	API     *api.Server
 	Build   BuildInfo
 
-	clients *targets.ClientFactory
-	notif   *notify.Notifier
-	closers []func()
+	clients    *targets.ClientFactory
+	background []backgroundTask
+	notif      *notify.Notifier
+	closers    []func()
 }
 
 // OpenStore opens the database from config (used by `migrate` without the rest of the app).
@@ -172,6 +173,10 @@ func (a *App) Run(ctx context.Context) error {
 		})
 		g.Go(func() error { a.housekeeping(ctx); return nil })
 		g.Go(func() error { a.runScheduler(ctx); return nil })
+		for _, t := range a.background {
+			a.Logger.Debug("starting extension task", "task", t.name)
+			g.Go(func() error { t.fn(ctx); return nil })
+		}
 	}
 	if a.Mode == config.ModeWorker || a.Config.Workers.Embedded {
 		w := a.NewWorker()
