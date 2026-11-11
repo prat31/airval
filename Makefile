@@ -70,9 +70,13 @@ check: lint
 dev:
 	$(GO) run ./cmd/airval dev
 
-## bench: execution-engine benchmarks (plan §3.4); placeholder until the engine lands
-bench:
-	$(GO) test -run '^$$' -bench . -benchmem ./internal/...
+## bench: plan §3.4 engine benchmark on Postgres (≥ 5,000 examples/min, overhead p95 < 2 ms) + micro-benchmarks
+## (AIRVAL_BENCH_EXAMPLES overrides the run size; BENCH_OUT=file also writes the output for regression checks)
+BENCH_OUT ?= /dev/null
+bench: pg-up
+	AIRVAL_TEST_PG_URL='$(AIRVAL_TEST_PG_URL)' $(GO) test -run '^$$' -bench BenchmarkEngine -benchtime 1x \
+		./internal/enginetest/ | tee $(BENCH_OUT)
+	$(GO) test -run '^$$' -bench . -benchmem ./internal/targets/ ./internal/evaluators/ ./internal/aggregate/
 
 clean:
 	rm -rf bin airval-data
