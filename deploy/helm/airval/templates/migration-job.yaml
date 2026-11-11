@@ -1,0 +1,53 @@
+{{- if .Values.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "airval.fullname" . }}-migrate
+  labels:
+    {{- include "airval.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    # With the bundled CloudNativePG database the cluster only exists after install, so the server migrates itself
+    # on first start and the Job runs on upgrades only.
+    "helm.sh/hook": {{ ternary "pre-upgrade" "pre-install,pre-upgrade" .Values.postgresql.cnpg.enabled }}
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "airval.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      # Hook resources are created before the chart's ServiceAccount, and migrations need no Kubernetes API access.
+      automountServiceAccountToken: false
+      {{- with .Values.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "airval.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["migrate", "up"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            {{- include "airval.env" (dict "ctx" . "role" "migrate") | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migration.resources | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+{{- end }}

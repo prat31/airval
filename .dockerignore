@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+bin
+dist
+airval-data
+**/node_modules
+web/dist
+*.db
+*.db-*
+.env
+coverage.out
+deploy/helm
+plan

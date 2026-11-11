@@ -1,0 +1,19 @@
+# External NATS + existing Secrets + Gateway API + worker HPA.
+secrets:
+  existingSecret: airval-secrets
+postgresql:
+  external:
+    existingSecret: airval-db
+nats:
+  enabled: false
+  external:
+    url: nats://nats.messaging.svc:4222
+worker:
+  hpa:
+    enabled: true
+gateway:
+  enabled: true
+  hostnames: [airval.example.com]
+  parentRefs:
+    - name: shared-gateway
+      namespace: gateway-system

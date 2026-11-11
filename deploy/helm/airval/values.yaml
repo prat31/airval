@@ -1,0 +1,249 @@
+# airval Helm chart values. See README.md for the quickstart and values.schema.json for validation.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/airval/airval
+  # Defaults to the chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+pullSecrets: []
+
+# ---------------------------------------------------------------------------------------------
+# Application configuration (non-secret). Becomes AIRVAL_* env vars (first "_" splits section/key).
+# ---------------------------------------------------------------------------------------------
+config:
+  # Public URL users open (links, cookies). Set it when using an Ingress/Gateway.
+  baseUrl: ""
+  logLevel: info
+  logFormat: json
+  # Set true when serving over HTTPS (Ingress TLS / Gateway listener).
+  cookieSecure: false
+  allowSignup: false
+  # OTLP/gRPC endpoint for traces, e.g. "otel-collector.observability:4317". Empty disables export.
+  otlpEndpoint: ""
+  traceSampleRatio: 0.1
+  # Extra AIRVAL_* settings as a map, e.g. { AIRVAL_SECURITY_DENY_CIDRS: "10.0.0.0/8" }.
+  env: {}
+  # Extra raw container env entries (valueFrom, etc.) added to every airval pod.
+  extraEnv: []
+
+# ---------------------------------------------------------------------------------------------
+# Secrets. Either point at an existing Secret (recommended for GitOps) or let the chart create one.
+# ---------------------------------------------------------------------------------------------
+secrets:
+  # Existing Secret holding the master key (and optionally previous keys / bootstrap password).
+  existingSecret: ""
+  keys:
+    masterKey: secrets-master-key
+    previousKeys: secrets-previous-keys
+    bootstrapAdminPassword: bootstrap-admin-password
+  # Chart-created Secret: base64 of 32 bytes (`airval secrets gen-key`). When empty, a key is generated on first
+  # install and kept stable across upgrades via `lookup` (not available with `helm template`/Argo CD: use
+  # existingSecret or set it explicitly there).
+  masterKey: ""
+  keyVersion: 1
+  # Older keys kept readable after rotation: "1:<base64>,2:<base64>". Chart-created Secret only.
+  previousKeys: ""
+
+# Optional first-boot admin (created only while there are no users).
+bootstrap:
+  adminEmail: ""
+  adminName: Admin
+  orgName: Default
+  # Stored in the chart-created Secret. With secrets.existingSecret, add the key there instead.
+  adminPassword: ""
+
+# ---------------------------------------------------------------------------------------------
+# Database: external Postgres (recommended) or an optional CloudNativePG cluster for evaluation.
+# ---------------------------------------------------------------------------------------------
+postgresql:
+  external:
+    # postgres://user:pass@host:5432/airval?sslmode=require (stored in the chart-created Secret) ...
+    url: ""
+    # ... or a Secret you manage that contains the URL.
+    existingSecret: ""
+    existingSecretKey: database-url
+    maxOpenConns: 0
+  # Requires the CloudNativePG operator (https://cloudnative-pg.io) installed in the cluster.
+  cnpg:
+    enabled: false
+    instances: 1
+    imageName: ""
+    storage:
+      size: 10Gi
+      storageClass: ""
+    resources: {}
+
+# ---------------------------------------------------------------------------------------------
+# NATS JetStream: official subchart (3 replicas) or an external cluster.
+# ---------------------------------------------------------------------------------------------
+nats:
+  enabled: true
+  external:
+    url: ""
+  # --- values below configure the official nats subchart (https://github.com/nats-io/k8s) ---
+  config:
+    cluster:
+      enabled: true
+      replicas: 3
+    jetstream:
+      enabled: true
+      fileStore:
+        pvc:
+          size: 10Gi
+    monitor:
+      enabled: true
+  service:
+    ports:
+      monitor:
+        enabled: true
+  natsBox:
+    enabled: false
+
+# ---------------------------------------------------------------------------------------------
+# server: API + UI + scheduler + planner (stateless)
+# ---------------------------------------------------------------------------------------------
+server:
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 512Mi}
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  pdb:
+    enabled: true
+    minAvailable: 1
+  terminationGracePeriodSeconds: 40
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  extraEnv: []
+
+# ---------------------------------------------------------------------------------------------
+# worker: executes runs. Scale on CPU (hpa) or JetStream consumer lag (keda), never both.
+# ---------------------------------------------------------------------------------------------
+worker:
+  replicaCount: 2
+  # Parallel examples in flight per worker (AIRVAL_WORKERS_CONCURRENCY).
+  concurrency: 256
+  judgeConcurrency: 32
+  resources:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {memory: 1Gi}
+  hpa:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+  keda:
+    enabled: false
+    minReplicaCount: 1
+    maxReplicaCount: 50
+    pollingInterval: 15
+    cooldownPeriod: 120
+    # Pending jobs per replica before scaling out.
+    lagThreshold: 100
+    # NATS monitoring endpoint host:port. Defaults to the bundled NATS service on :8222.
+    natsMonitoringEndpoint: ""
+    account: "$G"
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+  # Workers stop pulling, finish in-flight work and nak the rest: keep this above workers.shutdown_timeout (30s).
+  terminationGracePeriodSeconds: 60
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  extraEnv: []
+
+# Schema migrations: a pre-install/pre-upgrade hook Job (`airval migrate up`).
+migration:
+  enabled: true
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+# ---------------------------------------------------------------------------------------------
+# Exposure
+# ---------------------------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: airval.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Gateway API HTTPRoute (alternative to Ingress).
+gateway:
+  enabled: false
+  hostnames: []
+  parentRefs: []
+  # - name: shared-gateway
+  #   namespace: gateway-system
+  annotations: {}
+
+# ---------------------------------------------------------------------------------------------
+# Cluster integration
+# ---------------------------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+networkPolicy:
+  enabled: false
+  # Extra ingress sources for the server (namespaceSelector/podSelector/ipBlock peers), e.g. the ingress controller.
+  ingressFrom: []
+  # Additional egress rules. DNS, Postgres, NATS and HTTPS (targets, LLM providers) egress is allowed by default.
+  extraEgress: []
+  # Ports allowed for egress to the database (when external.url points to a non-default port).
+  databasePort: 5432
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+# `helm test` pod: GET /readyz through the Service.
+test:
+  image:
+    repository: busybox
+    tag: "1.37"

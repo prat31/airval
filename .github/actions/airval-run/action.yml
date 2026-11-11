@@ -1,0 +1,136 @@
+name: airval run
+description: Run an airval Suite from CI, fail the job when the Gate fails, and post (or update) a PR comment with the results.
+author: airval
+
+inputs:
+  server-url:
+    description: Base URL of your airval server (e.g. https://airval.example.com).
+    required: true
+  api-key:
+    description: airval API key (store it as a secret).
+    required: true
+  suite:
+    description: Suite id or slug.
+    required: true
+  project:
+    description: Project id (needed when the suite is given by slug).
+    required: false
+    default: ""
+  target:
+    description: Target id(s), comma separated. Defaults to the suite's targets.
+    required: false
+    default: ""
+  labels:
+    description: Extra run labels as newline separated key=value pairs (git_sha, git_ref and run_url are added automatically).
+    required: false
+    default: ""
+  timeout:
+    description: Overall timeout (Go duration).
+    required: false
+    default: 30m
+  version:
+    description: airval CLI version to install (a release tag, or "latest").
+    required: false
+    default: latest
+  comment:
+    description: Post or update a PR comment with the Markdown summary (pull_request events only).
+    required: false
+    default: "true"
+  comment-tag:
+    description: Distinguishes comments when several Suites run in one PR.
+    required: false
+    default: airval
+  github-token:
+    description: Token used to post the PR comment (needs pull-requests - write).
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  exit-code:
+    description: Exit code of `airval run --gate` (0 = Gate passed).
+    value: ${{ steps.run.outputs.exit_code }}
+  summary-file:
+    description: Path of the Markdown summary.
+    value: ${{ steps.run.outputs.summary_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install airval
+      shell: bash
+      env:
+        AIRVAL_VERSION: ${{ inputs.version }}
+        AIRVAL_INSTALL_DIR: ${{ runner.temp }}/airval-bin
+      run: |
+        set -euo pipefail
+        curl -fsSL "https://raw.githubusercontent.com/airval/airval/main/scripts/install.sh" | sh
+        echo "$AIRVAL_INSTALL_DIR" >> "$GITHUB_PATH"
+
+    - name: Run suite
+      id: run
+      shell: bash
+      env:
+        AIRVAL_URL: ${{ inputs.server-url }}
+        AIRVAL_API_KEY: ${{ inputs.api-key }}
+        AIRVAL_PROJECT: ${{ inputs.project }}
+        IN_SUITE: ${{ inputs.suite }}
+        IN_TARGET: ${{ inputs.target }}
+        IN_LABELS: ${{ inputs.labels }}
+        IN_TIMEOUT: ${{ inputs.timeout }}
+        GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        GIT_REF: ${{ github.head_ref || github.ref_name }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -uo pipefail
+        summary="$RUNNER_TEMP/airval-summary.md"
+        args=(run --suite "$IN_SUITE" --gate --markdown --timeout "$IN_TIMEOUT"
+              --label "git_sha=$GIT_SHA" --label "git_ref=$GIT_REF" --label "run_url=$RUN_URL")
+        IFS=',' read -r -a targets <<< "$IN_TARGET"
+        for t in "${targets[@]}"; do [ -n "$t" ] && args+=(--target "$t"); done
+        while IFS= read -r l; do [ -n "$l" ] && args+=(--label "$l"); done <<< "$IN_LABELS"
+
+        airval "${args[@]}" | tee "$summary"
+        code=${PIPESTATUS[0]}
+        echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+        echo "summary_file=$summary" >> "$GITHUB_OUTPUT"
+        { echo '### airval'; cat "$summary"; } >> "$GITHUB_STEP_SUMMARY"
+        exit 0 # the gate verdict is enforced in the last step so the comment is always posted
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      env:
+        SUMMARY_FILE: ${{ steps.run.outputs.summary_file }}
+        EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+        COMMENT_TAG: ${{ inputs.comment-tag }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const marker = `<!-- airval-run:${process.env.COMMENT_TAG} -->`;
+          const verdict = process.env.EXIT_CODE === '0' ? 'Gate passed' : 'Gate failed';
+          const body = `${marker}\n**airval: ${verdict}**\n\n${fs.readFileSync(process.env.SUMMARY_FILE, 'utf8')}`;
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+          const existing = comments.find((c) => c.body && c.body.startsWith(marker));
+          try {
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+          } catch (e) {
+            // Forks get a read-only token: the job summary above still has the results.
+            core.warning(`Could not post the PR comment: ${e.message}`);
+          }
+
+    - name: Enforce the Gate
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+      run: |
+        if [ "$EXIT_CODE" != "0" ]; then
+          echo "::error::airval gate failed (exit code $EXIT_CODE)"
+          exit "$EXIT_CODE"
+        fi
