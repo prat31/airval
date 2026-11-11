@@ -137,14 +137,13 @@ func TestAPIEndToEnd(t *testing.T) {
 	// Targets: config change creates a new version, same config doesn't.
 	var tg obj
 	owner.do("POST", "/v1/projects/"+pid+"/targets", obj{"name": "prod", "kind": "http",
-		"config": obj{"http": obj{"url": "http://svc/chat"}}}, 201, &tg)
+		"config": obj{"url": "http://svc/chat"}}, 201, &tg)
 	tid := tg["id"].(string)
-	owner.do("PATCH", "/v1/targets/"+tid, obj{"config": obj{"http": obj{"url": "http://svc/chat"}}}, 200, &tg)
-	owner.do("PATCH", "/v1/targets/"+tid, obj{"config": obj{"http": obj{"url": "http://svc/v2"}}}, 200, &tg)
+	owner.do("PATCH", "/v1/targets/"+tid, obj{"config": obj{"url": "http://svc/chat"}}, 200, &tg)
+	owner.do("PATCH", "/v1/targets/"+tid, obj{"config": obj{"url": "http://svc/v2"}}, 200, &tg)
 	if n := tg["current_version"].(obj)["number"].(float64); n != 2 {
 		t.Fatalf("target version %v", n)
 	}
-	owner.do("POST", "/v1/targets/"+tid+":test", obj{}, 501, nil)
 	owner.do("POST", "/v1/projects/"+pid+"/targets", obj{"name": "bad", "kind": "nope", "config": obj{}}, 422, nil)
 
 	// Datasets: upsert, publish, export.
@@ -188,7 +187,7 @@ func TestAPIEndToEnd(t *testing.T) {
 	if ev["category"] != "deterministic" || ev["version"].(float64) != 1 {
 		t.Fatalf("evaluator %v", ev)
 	}
-	owner.do("PATCH", "/v1/evaluators/"+ev["id"].(string), obj{"config": obj{"case_sensitive": false}}, 200, &ev)
+	owner.do("PATCH", "/v1/evaluators/"+ev["id"].(string), obj{"config": obj{"ignore_case": true}}, 200, &ev)
 	if ev["version"].(float64) != 2 {
 		t.Fatal("evaluator version bump")
 	}
@@ -198,14 +197,11 @@ func TestAPIEndToEnd(t *testing.T) {
 	sid := su["id"].(string)
 	owner.do("GET", "/v1/projects/"+pid+"/suites/by-slug/smoke-test", nil, 200, nil)
 	var gate obj
-	owner.do("POST", "/v1/suites/"+sid+"/gates", obj{"name": "quality", "expr": obj{"op": "and", "args": []obj{
-		{"op": "compare", "fn": "mean", "metric": "evaluator", "evaluator_id": ev["id"], "comparator": ">=", "value": 0.85},
-		{"op": "compare", "fn": "count", "metric": "results", "selector": "critical_fail", "comparator": "==", "value": 0},
-	}}}, 201, &gate)
-	if !strings.Contains(gate["text"].(string), ">= 0.85 and count(critical_fail) == 0") {
+	owner.do("POST", "/v1/suites/"+sid+"/gates", obj{"name": "quality", "text": "mean(exact) >= 0.85 and count(critical_fail) == 0"}, 201, &gate)
+	if gate["text"] != "mean(exact) >= 0.85 and count(critical_fail) == 0" {
 		t.Fatalf("gate text %q", gate["text"])
 	}
-	owner.do("POST", "/v1/suites/"+sid+"/gates", obj{"expr": obj{"op": "compare", "fn": "bogus"}}, 422, nil)
+	owner.do("POST", "/v1/suites/"+sid+"/gates", obj{"expr": obj{"op": "compare", "fn": "bogus"}}, 400, nil)
 	var trig obj
 	owner.do("POST", "/v1/suites/"+sid+"/triggers", obj{"kind": "schedule", "config": obj{"cron": "0 3 * * *", "timezone": "Europe/Berlin"}}, 201, &trig)
 	if trig["next_fire_at"] == nil {
