@@ -1,0 +1,116 @@
+# Production-shaped airval stack: Postgres 17 + NATS JetStream + migrate (one-shot) + server + 2 workers.
+#
+#   cp .env.example .env     # set AIRVAL_SECRETS_MASTER_KEY and POSTGRES_PASSWORD
+#   docker compose up -d     # http://localhost:8080
+#   docker compose --profile mocktarget up -d   # also starts a fake AI service at http://mocktarget:9090
+#
+# Run from deploy/docker. The image is built from the repo root when it is not already available.
+
+name: airval
+
+x-airval: &airval
+  image: ${AIRVAL_IMAGE:-ghcr.io/airval/airval:latest}
+  build:
+    context: ../..
+    dockerfile: deploy/docker/Dockerfile
+    target: airval
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: [/tmp]
+  environment: &airval-env
+    AIRVAL_DATABASE_URL: postgres://airval:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/airval?sslmode=disable
+    AIRVAL_NATS_URL: nats://nats:4222
+    AIRVAL_SECRETS_MASTER_KEY: ${AIRVAL_SECRETS_MASTER_KEY:?set AIRVAL_SECRETS_MASTER_KEY in .env (airval secrets gen-key)}
+    AIRVAL_DATABASE_AUTO_MIGRATE: "false" # the migrate service owns schema changes
+    AIRVAL_SERVER_BASE_URL: ${AIRVAL_SERVER_BASE_URL:-http://localhost:8080}
+    AIRVAL_AUTH_COOKIE_SECURE: ${AIRVAL_AUTH_COOKIE_SECURE:-false}
+    AIRVAL_WORKERS_CONCURRENCY: ${AIRVAL_WORKERS_CONCURRENCY:-256}
+    AIRVAL_TELEMETRY_LOG_LEVEL: ${AIRVAL_TELEMETRY_LOG_LEVEL:-info}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airval
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: airval
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airval -d airval"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *airval
+    restart: "no"
+    command: ["migrate", "up"]
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  server:
+    <<: *airval
+    command: ["server"]
+    environment:
+      <<: *airval-env
+      AIRVAL_BOOTSTRAP_ADMIN_EMAIL: ${AIRVAL_BOOTSTRAP_ADMIN_EMAIL:-}
+      AIRVAL_BOOTSTRAP_ADMIN_PASSWORD: ${AIRVAL_BOOTSTRAP_ADMIN_PASSWORD:-}
+      AIRVAL_BOOTSTRAP_ORG_NAME: ${AIRVAL_BOOTSTRAP_ORG_NAME:-Default}
+    ports:
+      - "${AIRVAL_PORT:-8080}:8080"
+    depends_on:
+      postgres: {condition: service_healthy}
+      nats: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/airval-probe", "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  worker:
+    <<: *airval
+    command: ["worker"]
+    # Scale with: docker compose up -d --scale worker=4
+    deploy:
+      replicas: 2
+    depends_on:
+      postgres: {condition: service_healthy}
+      nats: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    stop_grace_period: 45s # finish in-flight work, nak the rest
+
+  # Fake AI service to evaluate against (target URL: http://mocktarget:9090).
+  mocktarget:
+    profiles: [mocktarget]
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: mocktarget
+    image: ${AIRVAL_MOCKTARGET_IMAGE:-ghcr.io/airval/mocktarget:latest}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    ports:
+      - "${AIRVAL_MOCKTARGET_PORT:-9090}:9090"
+
+volumes:
+  postgres-data:
+  nats-data:

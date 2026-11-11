@@ -1,0 +1,159 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# Releases are cut by .github/workflows/release.yml on `v*` tags.
+# Local dry run: goreleaser release --snapshot --clean --skip=publish,sign,sbom,docker
+version: 2
+project_name: airval
+
+before:
+  hooks:
+    - go mod download
+    - npm --prefix web ci --no-audit --no-fund
+    - npm --prefix web run build
+
+report_sizes: true
+
+builds:
+  - id: airval
+    main: ./cmd/airval
+    binary: airval
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+  # Tiny HTTP health probe baked into the container image (distroless has no shell, curl or wget).
+  - id: probe
+    main: ./deploy/docker/probe
+    binary: airval-probe
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: airval
+    ids: [airval]
+    formats: [tar.gz]
+    # airval_<os>_<arch>.tar.gz (plan 001 §14), consumed by scripts/install.sh
+    name_template: "airval_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - id: archive-sboms
+    artifacts: archive
+    cmd: syft
+    args: ["$artifact", "--output", "spdx-json=$document"]
+    documents: ["${artifact}.sbom.spdx.json"]
+
+signs:
+  # Keyless (Sigstore) signature of the checksum file: verify with
+  #   cosign verify-blob --certificate checksums.txt.pem --signature checksums.txt.sig \
+  #     --certificate-identity-regexp 'https://github.com/airval/airval/' \
+  #     --certificate-oidc-issuer https://token.actions.githubusercontent.com checksums.txt
+  - cmd: cosign
+    artifacts: checksum
+    certificate: "${artifact}.pem"
+    signature: "${artifact}.sig"
+    args:
+      - sign-blob
+      - --yes
+      - --output-certificate=${certificate}
+      - --output-signature=${signature}
+      - ${artifact}
+
+dockers_v2:
+  - id: airval
+    ids: [airval, probe]
+    dockerfile: deploy/docker/Dockerfile.goreleaser
+    images:
+      - ghcr.io/airval/airval
+    tags:
+      - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - "{{ if not .IsNightly }}latest{{ end }}"
+    platforms: [linux/amd64, linux/arm64]
+    labels:
+      org.opencontainers.image.title: airval
+      org.opencontainers.image.description: Self-hostable evaluation platform for AI services
+      org.opencontainers.image.url: https://github.com/airval/airval
+      org.opencontainers.image.source: https://github.com/airval/airval
+      org.opencontainers.image.vendor: airval
+      org.opencontainers.image.licenses: Apache-2.0
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+    sbom: true
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    args: ["sign", "--yes", "${artifact}@${digest}"]
+
+# brew install airval/tap/airval
+homebrew_casks:
+  - name: airval
+    ids: [airval]
+    repository:
+      owner: airval
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/airval/airval
+    description: Self-hostable evaluation platform for AI services
+    license: Apache-2.0
+    directory: Casks
+    binaries: [airval]
+    caveats: "Try it: airval dev   (http://localhost:8080, data in ./airval-data)"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\(.+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: airval
+    name: airval
+  prerelease: auto
+  footer: |
+    ## Install
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/airval/airval/main/scripts/install.sh | sh
+    brew install airval/tap/airval
+    docker pull ghcr.io/airval/airval:{{ .Version }}
+    helm install airval oci://ghcr.io/airval/charts/airval --version {{ .Version }}
+    ```

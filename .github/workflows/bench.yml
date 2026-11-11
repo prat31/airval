@@ -1,0 +1,36 @@
+name: bench
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # nightly
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Placeholder web/dist (embedded at compile time)
+        run: mkdir -p web/dist && touch web/dist/.gitkeep
+      - name: Run benchmarks
+        run: make bench | tee bench.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ github.sha }}
+          path: bench.txt
+          retention-days: 90
+      - name: Summary
+        run: |
+          {
+            echo '### Benchmarks'
+            echo '```'
+            cat bench.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string"},
+        "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]}
+      }
+    },
+    "pullSecrets": {"type": "array", "items": {"type": "object"}},
+    "config": {
+      "type": "object",
+      "properties": {
+        "baseUrl": {"type": "string", "pattern": "^(https?://.+)?$"},
+        "logLevel": {"enum": ["debug", "info", "warn", "error"]},
+        "logFormat": {"enum": ["json", "text"]},
+        "cookieSecure": {"type": "boolean"},
+        "allowSignup": {"type": "boolean"},
+        "otlpEndpoint": {"type": "string"},
+        "traceSampleRatio": {"type": "number", "minimum": 0, "maximum": 1},
+        "env": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]}},
+        "extraEnv": {"type": "array"}
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "existingSecret": {"type": "string"},
+        "keys": {"type": "object", "additionalProperties": {"type": "string"}},
+        "masterKey": {"type": "string", "pattern": "^([A-Za-z0-9+/]{43}=)?$"},
+        "keyVersion": {"type": "integer", "minimum": 1},
+        "previousKeys": {"type": "string"}
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "properties": {
+        "adminEmail": {"type": "string"},
+        "adminName": {"type": "string"},
+        "orgName": {"type": "string"},
+        "adminPassword": {"type": "string"}
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "properties": {
+        "external": {
+          "type": "object",
+          "properties": {
+            "url": {"type": "string", "pattern": "^(postgres(ql)?://.+)?$"},
+            "existingSecret": {"type": "string"},
+            "existingSecretKey": {"type": "string"},
+            "maxOpenConns": {"type": "integer", "minimum": 0}
+          }
+        },
+        "cnpg": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "instances": {"type": "integer", "minimum": 1},
+            "imageName": {"type": "string"},
+            "storage": {"type": "object"},
+            "resources": {"type": "object"}
+          }
+        }
+      }
+    },
+    "nats": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "external": {
+          "type": "object",
+          "properties": {"url": {"type": "string", "pattern": "^((nats|tls|ws|wss)://.+)?$"}}
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "replicaCount": {"type": "integer", "minimum": 0},
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": {"enum": ["ClusterIP", "NodePort", "LoadBalancer"]},
+            "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+          }
+        },
+        "resources": {"type": "object"},
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer", "minimum": 1},
+            "maxReplicas": {"type": "integer", "minimum": 1},
+            "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100}
+          }
+        },
+        "pdb": {"type": "object"},
+        "terminationGracePeriodSeconds": {"type": "integer", "minimum": 0}
+      }
+    },
+    "worker": {
+      "type": "object",
+      "properties": {
+        "replicaCount": {"type": "integer", "minimum": 0},
+        "concurrency": {"type": "integer", "minimum": 1},
+        "judgeConcurrency": {"type": "integer", "minimum": 1},
+        "resources": {"type": "object"},
+        "hpa": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer", "minimum": 1},
+            "maxReplicas": {"type": "integer", "minimum": 1},
+            "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100}
+          }
+        },
+        "keda": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicaCount": {"type": "integer", "minimum": 0},
+            "maxReplicaCount": {"type": "integer", "minimum": 1},
+            "pollingInterval": {"type": "integer", "minimum": 1},
+            "cooldownPeriod": {"type": "integer", "minimum": 0},
+            "lagThreshold": {"type": "integer", "minimum": 1},
+            "natsMonitoringEndpoint": {"type": "string"},
+            "account": {"type": "string"}
+          }
+        },
+        "pdb": {"type": "object"},
+        "terminationGracePeriodSeconds": {"type": "integer", "minimum": 0}
+      }
+    },
+    "migration": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "backoffLimit": {"type": "integer", "minimum": 0},
+        "activeDeadlineSeconds": {"type": "integer", "minimum": 1}
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "className": {"type": "string"},
+        "annotations": {"type": "object"},
+        "hosts": {"type": "array", "items": {"type": "object", "required": ["host"]}},
+        "tls": {"type": "array"}
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "hostnames": {"type": "array", "items": {"type": "string"}},
+        "parentRefs": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "serviceAccount": {"type": "object"},
+    "serviceMonitor": {"type": "object", "properties": {"enabled": {"type": "boolean"}}},
+    "networkPolicy": {"type": "object", "properties": {"enabled": {"type": "boolean"}}},
+    "podSecurityContext": {"type": "object"},
+    "securityContext": {"type": "object"},
+    "test": {"type": "object"}
+  }
+}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/airval/airval/internal/aggregate"
 	"github.com/airval/airval/internal/api/gen"
 	"github.com/airval/airval/internal/store"
 )
@@ -268,7 +269,7 @@ func toSuite(x store.Suite) gen.Suite {
 }
 
 func toGate(g store.Gate) gen.Gate {
-	return gen.Gate{Id: g.ID, SuiteId: g.SuiteID, Name: g.Name, Expr: rawOr(g.Expr, "{}"), Text: GateText(g.Expr),
+	return gen.Gate{Id: g.ID, SuiteId: g.SuiteID, Name: g.Name, Expr: rawOr(g.Expr, "{}"), Text: gateTextRaw(g.Expr),
 		Enabled: g.Enabled, CreatedAt: g.CreatedAt, UpdatedAt: g.UpdatedAt}
 }
 
@@ -360,4 +361,13 @@ func toAnnotation(a store.Annotation) gen.Annotation {
 func toComparison(c store.Comparison) gen.Comparison {
 	return gen.Comparison{Id: c.ID, ProjectId: c.ProjectID, Name: c.Name, RunIds: c.RunIDs, CreatedBy: c.CreatedBy,
 		CreatedAt: c.CreatedAt}
+}
+
+// gateTextRaw renders a stored gate AST (evaluators appear as ids; handlers substitute names).
+func gateTextRaw(raw json.RawMessage) string {
+	var n aggregate.Node
+	if json.Unmarshal(raw, &n) != nil {
+		return ""
+	}
+	return n.String()
 }

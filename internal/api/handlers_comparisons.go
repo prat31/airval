@@ -8,19 +8,6 @@ import (
 	"github.com/airval/airval/internal/store"
 )
 
-func (s *Server) CompareRuns(ctx context.Context, req gen.CompareRunsRequestObject) (gen.CompareRunsResponseObject, error) {
-	if n := len(req.Params.Runs); n < 2 || n > 4 {
-		return nil, badRequest("compare 2 to 4 runs")
-	}
-	for _, id := range req.Params.Runs {
-		if _, err := s.run(ctx, id, store.RoleViewer); err != nil {
-			return nil, err
-		}
-	}
-	// TODO(wave): scorecard deltas, regressions/improvements, scatter and pairwise from aggregates + results (milestone 7).
-	return nil, notImplemented("run comparison")
-}
-
 func (s *Server) ListComparisons(ctx context.Context, req gen.ListComparisonsRequestObject) (gen.ListComparisonsResponseObject, error) {
 	if _, err := s.project(ctx, req.Project, store.RoleViewer); err != nil {
 		return nil, err

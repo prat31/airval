@@ -1,0 +1,29 @@
+{{- if .Values.postgresql.cnpg.enabled }}
+# Bundled Postgres for evaluation, managed by the CloudNativePG operator (must already be installed).
+# Production: prefer a managed/external Postgres via postgresql.external.*.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "airval.cnpgName" . }}
+  labels:
+    {{- include "airval.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  instances: {{ .Values.postgresql.cnpg.instances }}
+  {{- with .Values.postgresql.cnpg.imageName }}
+  imageName: {{ . | quote }}
+  {{- end }}
+  bootstrap:
+    initdb:
+      database: airval
+      owner: airval
+  storage:
+    size: {{ .Values.postgresql.cnpg.storage.size }}
+    {{- with .Values.postgresql.cnpg.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  {{- with .Values.postgresql.cnpg.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -179,14 +179,6 @@ func (s *Server) GetExample(ctx context.Context, req gen.GetExampleRequestObject
 	return gen.GetExample200JSONResponse(toExample(e)), nil
 }
 
-func (s *Server) ImportDataset(ctx context.Context, req gen.ImportDatasetRequestObject) (gen.ImportDatasetResponseObject, error) {
-	if _, err := s.dataset(ctx, req.Dataset, store.RoleEditor); err != nil {
-		return nil, err
-	}
-	// TODO(wave): parse via internal/importers (csv, jsonl, json, parquet, hf) then UpsertExamples (milestone 4).
-	return nil, notImplemented("dataset import")
-}
-
 func (s *Server) AddExamplesFromResults(ctx context.Context, req gen.AddExamplesFromResultsRequestObject) (gen.AddExamplesFromResultsResponseObject, error) {
 	d, err := s.dataset(ctx, req.Dataset, store.RoleEditor)
 	if err != nil {
