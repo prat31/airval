@@ -151,6 +151,7 @@ type Store interface {
 	AuditStore
 	CacheStore
 	EngineStore
+	InsightStore
 
 	// WithTx runs fn in a transaction. Nested calls reuse the outer transaction.
 	WithTx(ctx context.Context, fn func(tx Store) error) error

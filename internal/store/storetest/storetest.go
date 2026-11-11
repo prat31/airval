@@ -38,6 +38,7 @@ func Run(t *testing.T, open Opener) {
 		{"MiscComparisonsChannelsAuditCache", testMisc},
 		{"Transactions", testTx},
 		{"Engine", testEngine},
+		{"Insights", testInsights},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

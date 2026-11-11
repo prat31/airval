@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/airval/airval/internal/api/gen"
 	"github.com/airval/airval/internal/auth"
 	"github.com/airval/airval/internal/store"
+	"github.com/airval/airval/internal/targets"
 )
 
 // ---- projects ----
@@ -113,17 +115,16 @@ func (s *Server) DeleteProject(ctx context.Context, req gen.DeleteProjectRequest
 	return gen.DeleteProject204Response{}, nil
 }
 
-func (s *Server) GetTrends(ctx context.Context, req gen.GetTrendsRequestObject) (gen.GetTrendsResponseObject, error) {
-	if _, err := s.project(ctx, req.Project, store.RoleViewer); err != nil {
-		return nil, err
-	}
-	// TODO(wave): build series from ListRuns + ListRunAggregatesForRuns (milestone 7).
-	return nil, notImplemented("trends")
-}
-
 // ---- targets ----
 
-var targetKinds = map[string]bool{"http": true, "openai": true, "anthropic": true, "bedrock": true, "vertex": true, "agent": true}
+func validTargetKind(k string) bool {
+	for _, x := range targets.Kinds() {
+		if x == k {
+			return true
+		}
+	}
+	return false
+}
 
 func (s *Server) target(ctx context.Context, id uuid.UUID, min store.Role) (store.Target, error) {
 	t, err := s.Store.GetTarget(ctx, id)
@@ -153,11 +154,14 @@ func (s *Server) CreateTarget(ctx context.Context, req gen.CreateTargetRequestOb
 	if b == nil || strings.TrimSpace(b.Name) == "" {
 		return nil, invalid("name is required")
 	}
-	if !targetKinds[string(b.Kind)] {
+	if !validTargetKind(string(b.Kind)) {
 		return nil, invalid("unknown target kind %q", b.Kind)
 	}
 	cfg, err := jsonObject(b.Config, "config")
 	if err != nil {
+		return nil, err
+	}
+	if err := validateTargetConfig(string(b.Kind), cfg); err != nil {
 		return nil, err
 	}
 	t := store.Target{OrgID: p.OrgID, ProjectID: p.ID, Name: strings.TrimSpace(b.Name), Description: trimmed(b.Description),
@@ -199,6 +203,9 @@ func (s *Server) UpdateTarget(ctx context.Context, req gen.UpdateTargetRequestOb
 	if b.Config != nil {
 		cfg, err := jsonObject(*b.Config, "config")
 		if err != nil {
+			return nil, err
+		}
+		if err := validateTargetConfig(t.Kind, cfg); err != nil {
 			return nil, err
 		}
 		// New version only when the config actually changed.
@@ -260,17 +267,96 @@ func (s *Server) GetTargetVersion(ctx context.Context, req gen.GetTargetVersionR
 }
 
 func (s *Server) TestTarget(ctx context.Context, req gen.TestTargetRequestObject) (gen.TestTargetResponseObject, error) {
-	if _, err := s.target(ctx, req.Target, store.RoleEditor); err != nil {
+	t, err := s.target(ctx, req.Target, store.RoleEditor)
+	if err != nil {
 		return nil, err
 	}
-	// TODO(wave): run one example through internal/targets with the current version (milestone 3).
-	return nil, notImplemented("target test connection")
+	if t.CurrentVersion == nil {
+		return nil, invalid("target has no configuration version")
+	}
+	b := req.Body
+	if b == nil {
+		b = &gen.TargetTestRequest{}
+	}
+	res, err := s.runTargetTest(ctx, t.ProjectID, t.Kind, t.CurrentVersion.Config, b.Example, b.DatasetId)
+	if err != nil {
+		return nil, err
+	}
+	return gen.TestTarget200JSONResponse(res), nil
 }
 
 func (s *Server) TestTargetDraft(ctx context.Context, req gen.TestTargetDraftRequestObject) (gen.TestTargetDraftResponseObject, error) {
 	if _, err := s.project(ctx, req.Project, store.RoleEditor); err != nil {
 		return nil, err
 	}
-	// TODO(wave): same as TestTarget, for an unsaved config (milestone 3).
-	return nil, notImplemented("target test connection")
+	b := req.Body
+	if b == nil {
+		return nil, badRequest("request body is required")
+	}
+	if !validTargetKind(string(b.Kind)) {
+		return nil, fieldError("kind", "unknown target kind %q", b.Kind)
+	}
+	cfg, err := jsonObject(b.Config, "config")
+	if err != nil {
+		return nil, err
+	}
+	res, err := s.runTargetTest(ctx, req.Project, string(b.Kind), cfg, b.Example, b.DatasetId)
+	if err != nil {
+		return nil, err
+	}
+	return gen.TestTargetDraft200JSONResponse(res), nil
+}
+
+// runTargetTest builds an adapter (secrets resolved server-side), sends one sample example and
+// reports the redacted request, raw body, mapped response and per-path mapping matches.
+func (s *Server) runTargetTest(ctx context.Context, projectID uuid.UUID, kind string, cfg json.RawMessage,
+	ex *gen.ExampleData, datasetID *uuid.UUID) (gen.TargetTestResult, error) {
+	proj, err := s.Store.GetProject(ctx, projectID)
+	if err != nil {
+		return gen.TargetTestResult{}, err
+	}
+	sample, err := s.sampleExample(ctx, projectID, ex, datasetID)
+	if err != nil {
+		return gen.TargetTestResult{}, err
+	}
+	// A config that fails validation is a client error, not a failed connection.
+	if err := validateTargetConfig(kind, cfg); err != nil {
+		return gen.TargetTestResult{}, err
+	}
+	ad, err := targets.New(kind, cfg, s.targetDeps())
+	if err != nil {
+		return gen.TargetTestResult{}, fieldError("config", "%v", err).with("kind", kind)
+	}
+	tctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	rep := targets.TestConnection(tctx, ad, sample, targets.InvokeOptions{Secrets: s.secretResolver(ctx, proj)})
+	out := gen.TargetTestResult{Ok: rep.OK, LatencyMs: durMS(rep.Elapsed), Request: rawPtr(rep.Request),
+		RawResponse: rawPtr(rep.Raw)}
+	if rep.Error != "" {
+		out.Error = ptr(rep.Error)
+	}
+	if rep.ErrorClass != "" {
+		out.ErrorClass = ptr(rep.ErrorClass)
+	}
+	if rep.RetryAfter > 0 {
+		out.RetryAfterMs = ptr(rep.RetryAfter.Milliseconds())
+	}
+	resp := toTargetResponse(rep.Response)
+	out.Response = &resp
+	if len(rep.Mapping) > 0 {
+		m := make([]struct {
+			Field   string         `json:"field"`
+			Matched bool           `json:"matched"`
+			Path    string         `json:"path"`
+			Value   *gen.JSONValue `json:"value,omitempty"`
+		}, len(rep.Mapping))
+		for i, r := range rep.Mapping {
+			m[i].Field, m[i].Path, m[i].Matched = r.Field, r.Path, r.Matched
+			if r.Value != nil {
+				m[i].Value = rawPtr(mustJSON(r.Value))
+			}
+		}
+		out.Mapping = &m
+	}
+	return out, nil
 }

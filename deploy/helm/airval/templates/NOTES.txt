@@ -1,0 +1,41 @@
+airval {{ default .Chart.AppVersion .Values.image.tag }} installed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Open the UI:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else if .Values.gateway.enabled }}
+  via your Gateway{{ with .Values.gateway.hostnames }}: https://{{ index . 0 }}{{ end }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "airval.fullname" . }} 8080:{{ .Values.server.service.port }}
+  then http://localhost:8080
+{{- end }}
+
+{{- if .Values.bootstrap.adminEmail }}
+
+Sign in as {{ .Values.bootstrap.adminEmail }} (the password you configured), or complete the setup screen if the
+admin already existed.
+{{- else }}
+
+No bootstrap admin configured: complete the setup screen on first visit to create the owner and organization.
+{{- end }}
+
+Check health:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+{{- if not .Values.secrets.existingSecret }}
+
+Secrets master key: stored in Secret "{{ include "airval.secretName" . }}" (key {{ .Values.secrets.keys.masterKey }}).
+Back it up. Losing it makes every stored secret unreadable:
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "airval.secretName" . }} -o jsonpath='{.data.{{ .Values.secrets.keys.masterKey }}}' | base64 -d
+{{- end }}
+
+{{- if not .Values.config.baseUrl }}
+
+Tip: set config.baseUrl to the public URL (and config.cookieSecure=true behind TLS).
+{{- end }}
+{{- if .Values.postgresql.cnpg.enabled }}
+
+The bundled CloudNativePG database is meant for evaluation. Use postgresql.external.* for production.
+{{- end }}

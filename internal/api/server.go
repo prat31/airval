@@ -44,6 +44,9 @@ type Deps struct {
 	UI http.Handler
 	// Edition is "core" or "ee".
 	Edition string
+	// SendNotification delivers channel notifications (test sends and, via the engine, run events).
+	// Nil uses the minimal built-in slack/webhook senders (see notify_send.go).
+	SendNotification ChannelSender
 }
 
 // Server implements gen.StrictServerInterface.
