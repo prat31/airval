@@ -11,9 +11,9 @@ import (
 
 	"go.uber.org/goleak"
 
-	"github.com/airval/airval/internal/aggregate"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/aggregate"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/targets"
 )
 
 func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }

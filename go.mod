@@ -1,4 +1,4 @@
-module github.com/airval/airval
+module github.com/prat31/airval
 
 go 1.27
 

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airval/airval/internal/evalcore"
 	"github.com/parquet-go/parquet-go"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 var ctx = context.Background()

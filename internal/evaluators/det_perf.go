@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // LatencyConfig configures latency_ms.

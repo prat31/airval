@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // toolCalls returns the tool calls the target made: Response.ToolCalls, else

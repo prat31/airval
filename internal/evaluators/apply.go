@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // Turn aggregation modes for per-turn evaluation.

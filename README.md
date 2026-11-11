@@ -21,15 +21,15 @@ Open http://localhost:8080 and complete the setup screen (first owner + organiza
 ### 2. Install a release binary
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/airval/airval/main/scripts/install.sh | sh   # verifies the checksum
-brew install airval/tap/airval                                                              # or Homebrew
+curl -fsSL https://raw.githubusercontent.com/prat31/airval/main/scripts/install.sh | sh   # verifies the checksum
+brew install prat31/tap/airval                                                              # or Homebrew
 airval dev
 ```
 
 ### 3. Docker
 
 ```sh
-docker run -p 8080:8080 -v airval-data:/data ghcr.io/airval/airval:latest dev
+docker run -p 8080:8080 -v airval-data:/data ghcr.io/prat31/airval:latest dev
 ```
 
 Production-shaped stack (Postgres 17 + NATS JetStream + migrate + server + 2 workers; add `--profile mocktarget` for a
@@ -82,7 +82,7 @@ AIRVAL_URL=https://airval.example.com AIRVAL_API_KEY=airv_... \
 On GitHub Actions use the bundled composite action, which also posts/updates a PR comment:
 
 ```yaml
-- uses: airval/airval/.github/actions/airval-run@main
+- uses: prat31/airval/.github/actions/airval-run@main
   with:
     server-url: https://airval.example.com
     api-key: ${{ secrets.AIRVAL_API_KEY }}

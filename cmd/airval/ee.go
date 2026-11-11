@@ -3,4 +3,4 @@
 package main
 
 // Enterprise features register themselves with internal/ext from init().
-import _ "github.com/airval/airval/ee"
+import _ "github.com/prat31/airval/ee"

@@ -63,7 +63,7 @@ runs:
         AIRVAL_INSTALL_DIR: ${{ runner.temp }}/airval-bin
       run: |
         set -euo pipefail
-        curl -fsSL "https://raw.githubusercontent.com/airval/airval/main/scripts/install.sh" | sh
+        curl -fsSL "https://raw.githubusercontent.com/prat31/airval/main/scripts/install.sh" | sh
         echo "$AIRVAL_INSTALL_DIR" >> "$GITHUB_PATH"
 
     - name: Run suite

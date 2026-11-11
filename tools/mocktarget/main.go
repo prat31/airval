@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 func main() {

@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // OpenAIConfig configures any OpenAI-compatible chat completions API (OpenAI,

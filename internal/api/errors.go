@@ -9,10 +9,10 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/auth"
-	"github.com/airval/airval/internal/rbac"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/auth"
+	"github.com/prat31/airval/internal/rbac"
+	"github.com/prat31/airval/internal/store"
 )
 
 // Error is an API error with an HTTP status. Handlers return it (or store/rbac sentinels) as the

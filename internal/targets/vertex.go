@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // VertexConfig configures Google Gemini via generateContent. With project_id

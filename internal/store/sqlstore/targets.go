@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/store"
 )
 
 const targetSelect = `SELECT t.id, t.org_id, t.project_id, t.name, t.description, t.kind, t.current_version_id,

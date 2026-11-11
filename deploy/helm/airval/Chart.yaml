@@ -5,9 +5,9 @@ type: application
 version: 0.1.0
 appVersion: "0.1.0"
 kubeVersion: ">=1.27.0-0"
-home: https://github.com/airval/airval
+home: https://github.com/prat31/airval
 sources:
-  - https://github.com/airval/airval
+  - https://github.com/prat31/airval
 keywords: [evaluation, llm, ai, testing, observability]
 license: Apache-2.0
 dependencies:

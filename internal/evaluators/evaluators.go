@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // CostClass orders evaluators from cheap to expensive.

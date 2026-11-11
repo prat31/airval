@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/evaluators"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evaluators"
+	"github.com/prat31/airval/internal/store"
 )
 
 func (s *Server) evaluator(ctx context.Context, id uuid.UUID, min store.Role) (store.Evaluator, error) {

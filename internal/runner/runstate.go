@@ -15,13 +15,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/aggregate"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/evaluators"
-	"github.com/airval/airval/internal/planner"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/aggregate"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evaluators"
+	"github.com/prat31/airval/internal/planner"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/targets"
 )
 
 // runState is everything a worker needs to execute a run's shards, built once per run per

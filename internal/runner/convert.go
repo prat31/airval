@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/aggregate"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/aggregate"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/store"
 )
 
 // maxRawResponse bounds the raw response kept per result.

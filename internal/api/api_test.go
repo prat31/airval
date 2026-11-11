@@ -15,13 +15,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api"
-	"github.com/airval/airval/internal/auth"
-	"github.com/airval/airval/internal/config"
-	"github.com/airval/airval/internal/rbac"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/store/sqlstore"
+	"github.com/prat31/airval/internal/api"
+	"github.com/prat31/airval/internal/auth"
+	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/rbac"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/store/sqlstore"
 )
 
 type env struct {

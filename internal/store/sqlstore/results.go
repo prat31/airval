@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/store"
 )
 
 // Outputs larger than this are stored zstd-compressed in output_z.

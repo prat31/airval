@@ -14,10 +14,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/planner"
-	"github.com/airval/airval/internal/queue"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/planner"
+	"github.com/prat31/airval/internal/queue"
+	"github.com/prat31/airval/internal/store"
 )
 
 // ---- run execution (engine) ----

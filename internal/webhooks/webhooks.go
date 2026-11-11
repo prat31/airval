@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/targets"
 )
 
 // Headers.

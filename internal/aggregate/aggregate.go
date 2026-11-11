@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // Record is one result (example × trial) as seen by aggregation.

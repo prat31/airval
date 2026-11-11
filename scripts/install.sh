@@ -2,14 +2,14 @@
 # airval installer: downloads the latest (or a chosen) release from GitHub, verifies its checksum and installs the
 # single `airval` binary.
 #
-#   curl -fsSL https://raw.githubusercontent.com/airval/airval/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/prat31/airval/main/scripts/install.sh | sh
 #   curl -fsSL .../install.sh | sh -s -- --version v0.1.0 --dir ~/bin
 #
 # Options (or env): --version / AIRVAL_VERSION   release tag, default latest
 #                   --dir / AIRVAL_INSTALL_DIR   install directory, default /usr/local/bin (if writable) else ~/.local/bin
 set -eu
 
-REPO="airval/airval"
+REPO="prat31/airval"
 VERSION="${AIRVAL_VERSION:-latest}"
 DIR="${AIRVAL_INSTALL_DIR:-}"
 

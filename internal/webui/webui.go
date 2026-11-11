@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airval/airval"
+	"github.com/prat31/airval"
 )
 
 // Embedded returns the UI filesystem rooted at web/dist.

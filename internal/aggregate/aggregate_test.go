@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 func near(t *testing.T, name string, got, want, tol float64) {

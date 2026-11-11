@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 const (

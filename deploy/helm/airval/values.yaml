@@ -4,7 +4,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: ghcr.io/airval/airval
+  repository: ghcr.io/prat31/airval
   # Defaults to the chart appVersion.
   tag: ""
   pullPolicy: IfNotPresent

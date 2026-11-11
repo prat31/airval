@@ -14,10 +14,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/importers"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/importers"
+	"github.com/prat31/airval/internal/store"
 )
 
 const (

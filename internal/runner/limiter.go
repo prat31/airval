@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/airval/airval/internal/queue"
+	"github.com/prat31/airval/internal/queue"
 )
 
 // outcome of one call, fed back into the limiter.

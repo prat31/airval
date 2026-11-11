@@ -15,19 +15,19 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/airval/airval/internal/api"
-	"github.com/airval/airval/internal/auth"
-	"github.com/airval/airval/internal/config"
-	"github.com/airval/airval/internal/ext"
-	"github.com/airval/airval/internal/notify"
-	"github.com/airval/airval/internal/queue"
-	"github.com/airval/airval/internal/rbac"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/store/sqlstore"
-	"github.com/airval/airval/internal/targets"
-	"github.com/airval/airval/internal/telemetry"
-	"github.com/airval/airval/internal/webui"
+	"github.com/prat31/airval/internal/api"
+	"github.com/prat31/airval/internal/auth"
+	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/ext"
+	"github.com/prat31/airval/internal/notify"
+	"github.com/prat31/airval/internal/queue"
+	"github.com/prat31/airval/internal/rbac"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/store/sqlstore"
+	"github.com/prat31/airval/internal/targets"
+	"github.com/prat31/airval/internal/telemetry"
+	"github.com/prat31/airval/internal/webui"
 )
 
 // Build info, set by main from -ldflags.

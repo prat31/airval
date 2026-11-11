@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/store/migrations"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/store/migrations"
 )
 
 // dbtx is satisfied by *sql.DB, *sql.Conn and *sql.Tx.

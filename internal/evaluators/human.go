@@ -7,7 +7,7 @@ import (
 	"hash/fnv"
 	"strconv"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // Review modes for HumanConfig.Mode.

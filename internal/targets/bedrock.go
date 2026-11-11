@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // BedrockConfig configures AWS Bedrock via the Converse API (SigV4-signed).

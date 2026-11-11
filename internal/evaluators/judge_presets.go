@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // PresetConfig configures a preset LLM judge. Presets grade on a 1–5 scale

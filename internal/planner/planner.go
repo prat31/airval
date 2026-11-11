@@ -23,9 +23,9 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 
-	"github.com/airval/airval/internal/evaluators"
-	"github.com/airval/airval/internal/queue"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/evaluators"
+	"github.com/prat31/airval/internal/queue"
+	"github.com/prat31/airval/internal/store"
 )
 
 // Publisher is the queue surface the planner needs (*queue.Queue implements it).

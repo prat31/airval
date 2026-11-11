@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/store"
 )
 
 // ---- review queues ----

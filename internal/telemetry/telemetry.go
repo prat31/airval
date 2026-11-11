@@ -16,7 +16,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 
-	"github.com/airval/airval/internal/config"
+	"github.com/prat31/airval/internal/config"
 )
 
 // NewLogger builds the process logger. format: json | text.

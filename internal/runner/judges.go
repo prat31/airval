@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/evaluators"
-	"github.com/airval/airval/internal/targets"
-	"github.com/airval/airval/internal/telemetry"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evaluators"
+	"github.com/prat31/airval/internal/targets"
+	"github.com/prat31/airval/internal/telemetry"
 )
 
 // judgePool owns one limiter per judge provider so slow or throttled judges never consume target

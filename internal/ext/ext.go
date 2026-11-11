@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/airval/airval/internal/auth"
-	"github.com/airval/airval/internal/config"
-	"github.com/airval/airval/internal/rbac"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/auth"
+	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/rbac"
+	"github.com/prat31/airval/internal/store"
 )
 
 // Host is what core hands to extensions at startup.

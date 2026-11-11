@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airval/airval/internal/enginetest"
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/internal/enginetest"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 func runCLI(t *testing.T, args ...string) (string, string, error) {

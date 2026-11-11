@@ -9,7 +9,7 @@
 name: airval
 
 x-airval: &airval
-  image: ${AIRVAL_IMAGE:-ghcr.io/airval/airval:latest}
+  image: ${AIRVAL_IMAGE:-ghcr.io/prat31/airval:latest}
   build:
     context: ../..
     dockerfile: deploy/docker/Dockerfile
@@ -104,7 +104,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       target: mocktarget
-    image: ${AIRVAL_MOCKTARGET_IMAGE:-ghcr.io/airval/mocktarget:latest}
+    image: ${AIRVAL_MOCKTARGET_IMAGE:-ghcr.io/prat31/airval-mocktarget:latest}
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]

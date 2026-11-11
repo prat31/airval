@@ -10,11 +10,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/targets"
 )
 
 // ---- store <-> evalcore example conversion ----

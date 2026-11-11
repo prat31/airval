@@ -10,7 +10,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // EmbeddingConfig configures embedding_similarity.

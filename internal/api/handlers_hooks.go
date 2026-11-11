@@ -9,9 +9,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/planner"
-	"github.com/airval/airval/internal/webhooks"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/planner"
+	"github.com/prat31/airval/internal/webhooks"
 )
 
 // ---- inbound webhooks (raw route; HMAC-authenticated) ----

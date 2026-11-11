@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // Category groups kinds in the UI picker.

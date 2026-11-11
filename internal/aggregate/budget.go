@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // FailureBudget stops a doomed run early (plan §3.3 "Early stop"). A nil

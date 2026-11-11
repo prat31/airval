@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/airval/airval/internal/webhooks"
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/internal/webhooks"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 func num(v any) float64 {

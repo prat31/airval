@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/store"
 )
 
 func TestKeyringRoundTripAndRotation(t *testing.T) {

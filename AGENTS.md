@@ -12,7 +12,7 @@ results in clear, beautiful visualizations. It is the flagship product. Quality 
 ## Non-negotiables
 
 1. **Deployable service, three ways, always working:** a single static binary (`airval`), a Docker image
-   (`ghcr.io/airval/airval`), and a Helm chart (`deploy/helm/airval`). A change that breaks any of the three is not done.
+   (`ghcr.io/prat31/airval`), and a Helm chart (`deploy/helm/airval`). A change that breaks any of the three is not done.
 2. **Fast runs are a product feature.** Every change on the execution path is judged by throughput and wall-clock time.
    Use bounded concurrency, adaptive rate limiting, caching, batching and streaming. Don't do unbounded fan-out,
    N+1 queries, per-row DB writes in hot loops, or synchronous waits that could be pipelined.

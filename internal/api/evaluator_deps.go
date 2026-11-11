@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/evaluators"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evaluators"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/targets"
 )
 
 // validEvaluatorKind checks the kind against the evaluator registry (with a "did you mean").

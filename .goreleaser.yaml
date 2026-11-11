@@ -61,7 +61,7 @@ sboms:
 signs:
   # Keyless (Sigstore) signature of the checksum file: verify with
   #   cosign verify-blob --certificate checksums.txt.pem --signature checksums.txt.sig \
-  #     --certificate-identity-regexp 'https://github.com/airval/airval/' \
+  #     --certificate-identity-regexp 'https://github.com/prat31/airval/' \
   #     --certificate-oidc-issuer https://token.actions.githubusercontent.com checksums.txt
   - cmd: cosign
     artifacts: checksum
@@ -79,7 +79,7 @@ dockers_v2:
     ids: [airval, probe]
     dockerfile: deploy/docker/Dockerfile.goreleaser
     images:
-      - ghcr.io/airval/airval
+      - ghcr.io/prat31/airval
     tags:
       - "{{ .Version }}"
       - "{{ .Major }}.{{ .Minor }}"
@@ -88,8 +88,8 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: airval
       org.opencontainers.image.description: Self-hostable evaluation platform for AI services
-      org.opencontainers.image.url: https://github.com/airval/airval
-      org.opencontainers.image.source: https://github.com/airval/airval
+      org.opencontainers.image.url: https://github.com/prat31/airval
+      org.opencontainers.image.source: https://github.com/prat31/airval
       org.opencontainers.image.vendor: airval
       org.opencontainers.image.licenses: Apache-2.0
       org.opencontainers.image.version: "{{ .Version }}"
@@ -102,15 +102,15 @@ docker_signs:
     artifacts: manifests
     args: ["sign", "--yes", "${artifact}@${digest}"]
 
-# brew install airval/tap/airval
+# brew install prat31/tap/airval
 homebrew_casks:
   - name: airval
     ids: [airval]
     repository:
-      owner: airval
+      owner: prat31
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: https://github.com/airval/airval
+    homepage: https://github.com/prat31/airval
     description: Self-hostable evaluation platform for AI services
     license: Apache-2.0
     directory: Casks
@@ -146,14 +146,14 @@ changelog:
 
 release:
   github:
-    owner: airval
+    owner: prat31
     name: airval
   prerelease: auto
   footer: |
     ## Install
     ```sh
-    curl -fsSL https://raw.githubusercontent.com/airval/airval/main/scripts/install.sh | sh
-    brew install airval/tap/airval
-    docker pull ghcr.io/airval/airval:{{ .Version }}
-    helm install airval oci://ghcr.io/airval/charts/airval --version {{ .Version }}
+    curl -fsSL https://raw.githubusercontent.com/prat31/airval/main/scripts/install.sh | sh
+    brew install prat31/tap/airval
+    docker pull ghcr.io/prat31/airval:{{ .Version }}
+    helm install airval oci://ghcr.io/prat31/charts/airval --version {{ .Version }}
     ```

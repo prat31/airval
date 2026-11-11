@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // HTTPConfig configures the generic `http` target kind. method, url, headers

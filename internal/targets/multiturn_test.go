@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 func scripted(users ...string) *evalcore.Conversation {

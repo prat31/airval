@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/store/sqlstore"
-	"github.com/airval/airval/internal/store/storetest"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/store/sqlstore"
+	"github.com/prat31/airval/internal/store/storetest"
 )
 
 func TestContractSQLite(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/airval/airval/internal/ext"
+	"github.com/prat31/airval/internal/ext"
 )
 
 func init() { ext.Register(module{}) }

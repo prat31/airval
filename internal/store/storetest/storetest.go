@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/store"
 )
 
 // Opener returns a fresh, migrated, empty store for one test.

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // funcEval adapts a closure to Evaluator.

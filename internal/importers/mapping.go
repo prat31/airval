@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // Mapping tells the importer how source columns become Example fields. It is

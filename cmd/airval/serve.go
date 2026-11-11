@@ -10,12 +10,12 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/airval/airval/internal/app"
-	"github.com/airval/airval/internal/config"
-	"github.com/airval/airval/internal/ext"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store/migrations"
-	"github.com/airval/airval/internal/telemetry"
+	"github.com/prat31/airval/internal/app"
+	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/ext"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store/migrations"
+	"github.com/prat31/airval/internal/telemetry"
 )
 
 func edition() string { return ext.Edition() }

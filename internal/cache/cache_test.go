@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/airval/airval/internal/store/sqlstore"
+	"github.com/prat31/airval/internal/store/sqlstore"
 )
 
 func TestTwoLevel(t *testing.T) {

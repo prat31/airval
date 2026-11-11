@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Build from the repository root:
-#   docker buildx build -f deploy/docker/Dockerfile -t ghcr.io/airval/airval .
+#   docker buildx build -f deploy/docker/Dockerfile -t ghcr.io/prat31/airval .
 # Targets: airval (default), mocktarget (fake AI service for demos and benchmarks).
 
 ARG NODE_VERSION=lts
@@ -51,9 +51,9 @@ ARG COMMIT=unknown
 ARG CREATED=""
 LABEL org.opencontainers.image.title="airval" \
       org.opencontainers.image.description="Self-hostable evaluation platform for AI services" \
-      org.opencontainers.image.url="https://github.com/airval/airval" \
-      org.opencontainers.image.source="https://github.com/airval/airval" \
-      org.opencontainers.image.documentation="https://github.com/airval/airval#readme" \
+      org.opencontainers.image.url="https://github.com/prat31/airval" \
+      org.opencontainers.image.source="https://github.com/prat31/airval" \
+      org.opencontainers.image.documentation="https://github.com/prat31/airval#readme" \
       org.opencontainers.image.vendor="airval" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="${VERSION}" \

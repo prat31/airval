@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/airval/airval/internal/aggregate"
-	"github.com/airval/airval/internal/notify"
+	"github.com/prat31/airval/internal/aggregate"
+	"github.com/prat31/airval/internal/notify"
 )
 
 // Gates are stored as the aggregate expression AST with evaluators referenced by id.

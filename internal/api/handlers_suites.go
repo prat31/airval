@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
 
-	"github.com/airval/airval/internal/api/gen"
-	"github.com/airval/airval/internal/auth"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/api/gen"
+	"github.com/prat31/airval/internal/auth"
+	"github.com/prat31/airval/internal/store"
 )
 
 func (s *Server) suite(ctx context.Context, id uuid.UUID, min store.Role) (store.Suite, error) {

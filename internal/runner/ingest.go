@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/queue"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/queue"
+	"github.com/prat31/airval/internal/store"
 )
 
 // pending is one evaluated result waiting to be persisted.

@@ -236,7 +236,7 @@ function UserMenu({ onShortcuts }: { onShortcuts: () => void }) {
         <DropdownMenuItem icon={<Keyboard />} shortcut="?" onSelect={onShortcuts}>
           Keyboard shortcuts
         </DropdownMenuItem>
-        <DropdownMenuItem icon={<BookOpen />} onSelect={() => window.open('https://github.com/airval/airval', '_blank', 'noopener')}>
+        <DropdownMenuItem icon={<BookOpen />} onSelect={() => window.open('https://github.com/prat31/airval', '_blank', 'noopener')}>
           Documentation
         </DropdownMenuItem>
         <DropdownMenuSeparator />

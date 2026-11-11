@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 var benchAnswer = strings.Repeat("The quick brown fox jumps over the lazy dog near the river bank. ", 8)

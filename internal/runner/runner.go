@@ -26,15 +26,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/aggregate"
-	"github.com/airval/airval/internal/cache"
-	"github.com/airval/airval/internal/config"
-	"github.com/airval/airval/internal/notify"
-	"github.com/airval/airval/internal/queue"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/targets"
-	"github.com/airval/airval/internal/telemetry"
+	"github.com/prat31/airval/internal/aggregate"
+	"github.com/prat31/airval/internal/cache"
+	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/notify"
+	"github.com/prat31/airval/internal/queue"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/targets"
+	"github.com/prat31/airval/internal/telemetry"
 )
 
 // Deps are the worker's collaborators.

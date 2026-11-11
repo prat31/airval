@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/store"
 )
 
 const runCols = `id, org_id, project_id, suite_id, target_id, target_version_id, dataset_version_id, name,

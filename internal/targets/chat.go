@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // ChatCommon holds the settings shared by the LLM-provider kinds

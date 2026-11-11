@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // TestReport is what the UI playground shows for "Test connection".

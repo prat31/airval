@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/config"
-	"github.com/airval/airval/internal/store"
+	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/store"
 )
 
 // Cookie and header names.

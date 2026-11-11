@@ -13,15 +13,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/api"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/notify"
-	"github.com/airval/airval/internal/planner"
-	"github.com/airval/airval/internal/runner"
-	"github.com/airval/airval/internal/scheduler"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/api"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/notify"
+	"github.com/prat31/airval/internal/planner"
+	"github.com/prat31/airval/internal/runner"
+	"github.com/prat31/airval/internal/scheduler"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/targets"
 )
 
 func splitCIDRs(v string) []string {

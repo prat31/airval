@@ -16,7 +16,7 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 //go:embed prompts/*.tmpl

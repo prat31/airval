@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // AnthropicConfig configures the Anthropic Messages API.

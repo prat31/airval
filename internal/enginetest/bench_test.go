@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 // BenchmarkEngine reproduces plan §3.4: mock target with 10 ms latency and no rate limit,

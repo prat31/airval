@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // Field values for FieldSelector.Field.

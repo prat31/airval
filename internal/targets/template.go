@@ -9,7 +9,7 @@ import (
 	"text/template"
 	"text/template/parse"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // envKey is the root-map key holding the per-call *renderEnv.

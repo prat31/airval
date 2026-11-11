@@ -22,13 +22,13 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/airval/airval/internal/app"
-	"github.com/airval/airval/internal/auth"
-	"github.com/airval/airval/internal/config"
-	"github.com/airval/airval/internal/runner"
-	"github.com/airval/airval/internal/secrets"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/internal/app"
+	"github.com/prat31/airval/internal/auth"
+	"github.com/prat31/airval/internal/config"
+	"github.com/prat31/airval/internal/runner"
+	"github.com/prat31/airval/internal/secrets"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 // Options configure a harness.

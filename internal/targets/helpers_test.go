@@ -10,8 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 type mapSecrets map[string]string

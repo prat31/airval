@@ -4,7 +4,7 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/targets"
 )
 
 // classifyOutcome maps an adapter/LLM error to a limiter outcome and Retry-After hint.

@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airval/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evalcore"
 )
 
 // InvokeOptions carries per-call dependencies.

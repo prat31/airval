@@ -17,14 +17,14 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/airval/airval/internal/aggregate"
-	"github.com/airval/airval/internal/cache"
-	"github.com/airval/airval/internal/evalcore"
-	"github.com/airval/airval/internal/evaluators"
-	"github.com/airval/airval/internal/planner"
-	"github.com/airval/airval/internal/queue"
-	"github.com/airval/airval/internal/store"
-	"github.com/airval/airval/internal/targets"
+	"github.com/prat31/airval/internal/aggregate"
+	"github.com/prat31/airval/internal/cache"
+	"github.com/prat31/airval/internal/evalcore"
+	"github.com/prat31/airval/internal/evaluators"
+	"github.com/prat31/airval/internal/planner"
+	"github.com/prat31/airval/internal/queue"
+	"github.com/prat31/airval/internal/store"
+	"github.com/prat31/airval/internal/targets"
 )
 
 var tracer = otel.Tracer("airval/runner")

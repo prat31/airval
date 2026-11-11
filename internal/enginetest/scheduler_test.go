@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/airval/airval/internal/scheduler"
-	"github.com/airval/airval/tools/mocktarget/mock"
+	"github.com/prat31/airval/internal/scheduler"
+	"github.com/prat31/airval/tools/mocktarget/mock"
 )
 
 // TestScheduler: an overdue schedule trigger fires exactly once (missed fires are not replayed)
