@@ -28,6 +28,10 @@ x-airval: &airval
     AIRVAL_AUTH_COOKIE_SECURE: ${AIRVAL_AUTH_COOKIE_SECURE:-false}
     AIRVAL_WORKERS_CONCURRENCY: ${AIRVAL_WORKERS_CONCURRENCY:-256}
     AIRVAL_TELEMETRY_LOG_LEVEL: ${AIRVAL_TELEMETRY_LOG_LEVEL:-info}
+    # Built-in mock AI service + one-click sample project (demo data). Off by default; set
+    # AIRVAL_SERVER_MOCK_TARGET=true in .env. Workers reach it via the server's service name.
+    AIRVAL_SERVER_MOCK_TARGET: ${AIRVAL_SERVER_MOCK_TARGET:-false}
+    AIRVAL_SERVER_MOCK_URL: http://server:8080/_mock
 
 services:
   postgres:

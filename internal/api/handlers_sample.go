@@ -38,9 +38,12 @@ func (s *Server) mockHandler() http.Handler {
 	return mock.NewServer(cfg)
 }
 
-// MockBaseURL is the URL (without trailing slash) targets use to reach /_mock/. With an embedded
-// worker (airval dev) that is the loopback listener; otherwise workers reach it via server.base_url.
+// MockBaseURL is the URL (without trailing slash) targets use to reach /_mock/: server.mock_url when
+// set; with an embedded worker (airval dev) the loopback listener; otherwise server.base_url + /_mock.
 func (s *Server) MockBaseURL() string {
+	if s.Config != nil && s.Config.Server.MockURL != "" {
+		return strings.TrimRight(s.Config.Server.MockURL, "/")
+	}
 	s.mu.RLock()
 	addr := s.listenAddr
 	s.mu.RUnlock()

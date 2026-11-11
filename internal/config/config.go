@@ -72,6 +72,10 @@ type Server struct {
 	// MockTarget serves the built-in mock AI service at /_mock/ (used by the sample project).
 	// Default true for `airval dev`, false otherwise.
 	MockTarget bool `koanf:"mock_target" yaml:"mock_target"`
+	// MockURL is how workers reach the mock service (e.g. http://server:8080/_mock in Compose, where
+	// base_url's localhost would point at the worker itself). Empty: derived from the listener in
+	// `airval dev`, otherwise base_url + /_mock.
+	MockURL string `koanf:"mock_url" yaml:"mock_url"`
 }
 
 type Auth struct {
@@ -150,6 +154,7 @@ func defaults(mode Mode) map[string]any {
 		"server.shutdown_timeout":   "20s",
 		"server.max_upload_mb":      512,
 		"server.mock_target":        false,
+		"server.mock_url":           "",
 		"auth.session_ttl":          "720h",
 		"auth.cookie_secure":        false,
 		"workers.concurrency":       256,
