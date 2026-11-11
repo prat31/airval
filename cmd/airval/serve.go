@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -50,6 +52,11 @@ func devCmd(cfg func() string) *cobra.Command {
 			return runMode(cmd.Context(), config.ModeDev, cfg(), func(c *config.Config) {
 				if addr != "" {
 					c.Server.Addr = addr
+					// Keep links (webhook URLs, notifications, --open) pointing at this listener unless
+					// server.base_url was configured explicitly.
+					if os.Getenv("AIRVAL_SERVER_BASE_URL") == "" && c.Server.BaseURL == "http://localhost:8080" {
+						c.Server.BaseURL = devBaseURL(addr)
+					}
 				}
 				if open {
 					go func() {
@@ -61,8 +68,23 @@ func devCmd(cfg func() string) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&addr, "addr", "", "listen address (default :8080)")
+	cmd.Flags().StringVar(&addr, "listen", "", "alias for --addr")
 	cmd.Flags().BoolVar(&open, "open", false, "open the UI in a browser")
 	return cmd
+}
+
+// devBaseURL turns a listen address (":9000", "127.0.0.1:9000", "[::]:9000") into a browsable URL.
+func devBaseURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://localhost:8080"
+	}
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		host = "localhost"
+	} else if ip != nil && ip.To4() == nil {
+		host = "[" + host + "]"
+	}
+	return "http://" + host + ":" + port
 }
 
 func openBrowser(url string) {
@@ -211,13 +233,32 @@ func configCmd(cfg func() string) *cobra.Command {
 	var mode string
 	cmd := &cobra.Command{Use: "config", Short: "Configuration"}
 	pr := &cobra.Command{
-		Use:   "print",
-		Short: "Print the effective configuration (secrets redacted)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			c, err := config.LoadUnvalidated(config.Mode(mode), cfg())
+		Use:   "print [dev|server|worker]",
+		Short: "Print the effective configuration of a mode (defaults + file + env; secrets redacted)",
+		Long: "Print the configuration the given mode would run with: that mode's defaults, then the config file, then\n" +
+			"AIRVAL_* env vars. The mode comes from the argument, --mode, or AIRVAL_MODE (default: server).",
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			m := mode
+			if len(args) == 1 {
+				m = args[0]
+			}
+			if m == "" {
+				m = os.Getenv("AIRVAL_MODE")
+			}
+			if m == "" {
+				m = string(config.ModeServer)
+			}
+			switch config.Mode(m) {
+			case config.ModeDev, config.ModeServer, config.ModeWorker:
+			default:
+				return fmt.Errorf("unknown mode %q (use dev, server or worker)", m)
+			}
+			c, err := config.LoadUnvalidated(config.Mode(m), cfg())
 			if err != nil {
 				return err
 			}
+			fmt.Fprintf(cmd.OutOrStdout(), "# effective configuration for `airval %s`\n", m)
 			out, err := yaml.Marshal(c.Redacted())
 			if err != nil {
 				return err
@@ -226,7 +267,7 @@ func configCmd(cfg func() string) *cobra.Command {
 			return err
 		},
 	}
-	pr.Flags().StringVar(&mode, "mode", "dev", "mode whose defaults apply: dev|server|worker")
+	pr.Flags().StringVar(&mode, "mode", "", "mode whose defaults apply: dev, server or worker (default: $AIRVAL_MODE, else server)")
 	cmd.AddCommand(pr)
 	return cmd
 }

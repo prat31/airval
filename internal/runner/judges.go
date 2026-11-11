@@ -50,6 +50,25 @@ func (p *judgePool) limiter(provider string) *limiter {
 	return l
 }
 
+// simulator builds the user-simulator LLM of a run (rate-limited and retried like judges).
+func (p *judgePool) simulator(sec evalcore.SecretResolver, provider, model, secret, baseURL string) (evalcore.LLM, error) {
+	raw, err := llmConfig(provider, model, secret)
+	if err != nil {
+		return nil, err
+	}
+	if baseURL != "" {
+		var m map[string]any
+		_ = json.Unmarshal(raw, &m)
+		m["base_url"] = baseURL
+		raw, _ = json.Marshal(m)
+	}
+	inner, err := targets.NewLLM(provider, raw, targets.Deps{Clients: p.clients, DefaultConcurrency: p.concurrency}, sec)
+	if err != nil {
+		return nil, err
+	}
+	return &pooledLLM{inner: inner, lim: p.limiter(provider), provider: provider, maxAttempts: p.maxAttempts, metrics: p.metrics}, nil
+}
+
 // llmConfig builds a provider config for judges from a provider name, model and API-key secret.
 func llmConfig(provider, model, secret string) (json.RawMessage, error) {
 	cfg := map[string]any{"model": model}

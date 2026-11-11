@@ -30,6 +30,12 @@ export function Drawer({ open, onOpenChange, trigger, title, description, action
       <DialogPrimitive.Portal>
         {modal && <DialogOverlay className="bg-overlay/60" />}
         <DialogPrimitive.Content
+          // Focus the panel itself rather than its first button, so header tooltips don't pop open
+          // on every open (keyboard users Tab into the actions as usual).
+          onOpenAutoFocus={(e) => {
+            e.preventDefault()
+            ;(e.currentTarget as HTMLElement | null)?.focus()
+          }}
           className={cn(
             'fixed inset-y-0 right-0 z-50 flex max-w-full flex-col border-l border-border bg-surface shadow-dialog',
             'animate-drawer focus:outline-none',

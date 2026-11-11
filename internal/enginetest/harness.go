@@ -38,6 +38,8 @@ type Options struct {
 	Concurrency int // worker concurrency (default 256)
 	Mock        mock.Config
 	LogLevel    string // default "error"
+	// MockTarget serves the built-in mock at /_mock/ on the API server (sample project).
+	MockTarget bool
 }
 
 // Harness is a running airval.
@@ -86,6 +88,7 @@ func Start(tb testing.TB, o Options) *Harness {
 	cfg.Secrets = config.Secrets{MasterKey: secrets.GenerateKey(), KeyVersion: 1}
 	cfg.Workers.Concurrency, cfg.Workers.Embedded = o.Concurrency, false
 	cfg.Workers.ShutdownTimeout = 10 * time.Second
+	cfg.Server.MockTarget = o.MockTarget
 	cfg.Telemetry.LogLevel, cfg.Telemetry.LogFormat, cfg.Telemetry.OTLPEndpoint = o.LogLevel, "text", ""
 	cfg.Bootstrap = config.Bootstrap{AdminEmail: "admin@example.test", AdminPassword: randHex(12), AdminName: "Admin", OrgName: "Test"}
 	a, err := app.New(ctx, config.ModeServer, cfg, app.BuildInfo{Version: "test"})

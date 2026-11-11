@@ -47,6 +47,38 @@ const RUN_FIELDS = new Set<keyof Run>([
 const FLUSH_MS = 250
 const MAX_BACKOFF = 30_000
 
+/**
+ * Rows carried by one `result` event. The engine batches them (`{items: [...], count}`, up to 100
+ * compact rows per flush); a single row object is accepted too. Compact rows lack some fields of
+ * the full Result, so defaults keep the table's renderers safe until the list is refetched.
+ */
+export function resultRows(runId: string, ev: RunEvent, data: Record<string, unknown>): Result[] {
+  const raw: unknown[] = Array.isArray(data.items) ? data.items : 'id' in data ? [data] : []
+  const out: Result[] = []
+  for (const r of raw) {
+    if (!r || typeof r !== 'object' || !('id' in r)) continue
+    out.push({
+      run_id: runId,
+      example_revision_id: '',
+      trial: 0,
+      output: '',
+      latency_ms: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+      cost_usd: 0,
+      error: '',
+      cached: false,
+      tags: [],
+      scores: [],
+      created_at: ev.at,
+      ...(r as Partial<Result>),
+      // Compact scores carry no reasoning.
+      ...('scores' in r && Array.isArray(r.scores) ? { scores: (r.scores as Result['scores']).map((s) => ({ ...s, reason: s.reason ?? '', label: s.label ?? '' })) } : {}),
+    } as Result)
+  }
+  return out
+}
+
 function applyEvents(qc: QueryClient, runId: string, events: RunEvent[]) {
   let patch: Partial<Run> = {}
   const results: Result[] = []
@@ -54,7 +86,7 @@ function applyEvents(qc: QueryClient, runId: string, events: RunEvent[]) {
   for (const ev of events) {
     const data = (ev.data ?? {}) as Record<string, unknown>
     if (ev.type === 'result') {
-      if (data && typeof data === 'object' && 'id' in data) results.push(data as unknown as Result)
+      results.push(...resultRows(runId, ev, data))
       continue
     }
     for (const [k, v] of Object.entries(data)) if (RUN_FIELDS.has(k as keyof Run)) (patch as Record<string, unknown>)[k] = v

@@ -68,6 +68,8 @@ export function TrendLine({ series, format = 'percent', yDomain, threshold, area
             min: yDomain?.[0],
             max: yDomain?.[1],
             splitNumber: 4,
+            // A fixed 0–1 percent domain gets even 25% steps (splitNumber alone yields 0/30/60/90/100).
+            ...(format === 'percent' && yDomain?.[0] === 0 && yDomain?.[1] === 1 ? { interval: 0.25 } : {}),
             axisLabel: { formatter: (v: number) => formatValue(v, format) },
           },
           series: shown.map((s, i) => {

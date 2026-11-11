@@ -78,11 +78,32 @@ const errorMiddleware: Middleware = {
   },
 }
 
+/** Query params whose arrays the API takes repeated (`style: form, explode: true`); all others are comma-separated. */
+const EXPLODED = new Set(['label'])
+
+/**
+ * Serializes query objects the way api/openapi.yaml declares them: arrays comma-separated
+ * (`explode: false`, e.g. `status=running,queued`) except the few repeated params, objects skipped.
+ */
+export function querySerializer(query: Record<string, unknown>): string {
+  const sp = new URLSearchParams()
+  for (const [k, v] of Object.entries(query ?? {})) {
+    if (v === undefined || v === null) continue
+    if (Array.isArray(v)) {
+      if (!v.length) continue
+      if (EXPLODED.has(k)) for (const x of v) sp.append(k, String(x))
+      else sp.set(k, v.map(String).join(','))
+    } else if (typeof v !== 'object') sp.set(k, String(v))
+  }
+  return sp.toString()
+}
+
 export const api = createClient<paths>({
   // Paths in schema.d.ts already carry the /v1 prefix.
   baseUrl: '',
   credentials: 'include',
   headers: { Accept: 'application/json' },
+  querySerializer,
 })
 api.use(csrfMiddleware, errorMiddleware)
 

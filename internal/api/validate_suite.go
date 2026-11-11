@@ -25,13 +25,25 @@ func (s *Server) validateSuiteConfig(ctx context.Context, projectID uuid.UUID, r
 			ApplyTo     string    `json:"apply_to"`
 			Weight      *float64  `json:"weight"`
 		} `json:"evaluators"`
-		Trials *int `json:"trials"`
+		Trials    *int `json:"trials"`
+		Simulator *struct {
+			Provider string `json:"provider"`
+			Model    string `json:"model"`
+		} `json:"simulator"`
 	}
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return fieldError("config", "config does not match the suite schema: %v", err)
 	}
 	if c.Trials != nil && (*c.Trials < 1 || *c.Trials > 10) {
 		return fieldError("config.trials", "trials must be between 1 and 10")
+	}
+	if sim := c.Simulator; sim != nil {
+		if !set("openai", "anthropic", "vertex")[sim.Provider] {
+			return fieldError("config.simulator.provider", "simulator provider must be openai, anthropic or vertex")
+		}
+		if sim.Model == "" {
+			return fieldError("config.simulator.model", "simulator model is required")
+		}
 	}
 	for i, id := range c.TargetIDs {
 		t, err := s.Store.GetTarget(ctx, id)

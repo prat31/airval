@@ -69,6 +69,9 @@ type Server struct {
 	UIDir string `koanf:"ui_dir" yaml:"ui_dir"`
 	// MaxUploadMB caps dataset import uploads (default 512).
 	MaxUploadMB int `koanf:"max_upload_mb" yaml:"max_upload_mb"`
+	// MockTarget serves the built-in mock AI service at /_mock/ (used by the sample project).
+	// Default true for `airval dev`, false otherwise.
+	MockTarget bool `koanf:"mock_target" yaml:"mock_target"`
 }
 
 type Auth struct {
@@ -146,6 +149,7 @@ func defaults(mode Mode) map[string]any {
 		"server.base_url":           "http://localhost:8080",
 		"server.shutdown_timeout":   "20s",
 		"server.max_upload_mb":      512,
+		"server.mock_target":        false,
 		"auth.session_ttl":          "720h",
 		"auth.cookie_secure":        false,
 		"workers.concurrency":       256,
@@ -166,6 +170,7 @@ func defaults(mode Mode) map[string]any {
 	if mode == ModeDev {
 		d["database.url"] = "sqlite://" + DataDir + "/airval.db"
 		d["workers.embedded"] = true
+		d["server.mock_target"] = true
 		d["telemetry.log_format"] = "text"
 		d["telemetry.sample_ratio"] = 1.0
 	}

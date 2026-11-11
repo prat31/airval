@@ -19,7 +19,8 @@ export interface ScoreChipProps {
  */
 export function ScoreChip({ value, threshold, passed, label, size = 'md', className }: ScoreChipProps) {
   const state = passed ?? (value != null && threshold != null ? value >= threshold : undefined)
-  const nearThreshold = state === true && value != null && threshold != null && value - threshold < 0.05
+  // A marginal pass (just above the threshold) is flagged; a perfect score never is.
+  const nearThreshold = state === true && value != null && threshold != null && value < 1 && value - threshold < 0.05
   const tone =
     state === undefined
       ? 'text-text bg-surface-2 ring-border'

@@ -113,6 +113,7 @@ type suiteConfig struct {
 		TargetID *uuid.UUID `json:"target_id"`
 	} `json:"baseline"`
 	FailureBudget  *FailureBudget    `json:"failure_budget"`
+	Simulator      *Simulator        `json:"simulator"`
 	TimeoutSeconds int               `json:"timeout_seconds"`
 	Variables      map[string]string `json:"variables"`
 }
@@ -223,7 +224,7 @@ func (s *Service) planSuite(ctx context.Context, req StartRequest) (store.Run, [
 	}
 
 	cfg := RunConfig{Version: 1, Mode: ModeExecute, SuiteName: su.Name, TargetName: tgt.Name, TargetKind: tgt.Kind,
-		Trials: max(1, sc.Trials), TimeoutSeconds: sc.TimeoutSeconds, FailureBudget: sc.FailureBudget,
+		Trials: max(1, sc.Trials), TimeoutSeconds: sc.TimeoutSeconds, FailureBudget: sc.FailureBudget, Simulator: sc.Simulator,
 		Cache: CachePolicy{Target: false, Judges: true}}
 	if sc.Limits != nil {
 		cfg.Limits = *sc.Limits

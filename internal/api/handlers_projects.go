@@ -278,7 +278,7 @@ func (s *Server) TestTarget(ctx context.Context, req gen.TestTargetRequestObject
 	if b == nil {
 		b = &gen.TargetTestRequest{}
 	}
-	res, err := s.runTargetTest(ctx, t.ProjectID, t.Kind, t.CurrentVersion.Config, b.Example, b.DatasetId)
+	res, err := s.runTargetTest(ctx, t.ProjectID, t.Kind, t.CurrentVersion.Config, b.Example, b.DatasetId, b.Variables, b.Simulator)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +300,7 @@ func (s *Server) TestTargetDraft(ctx context.Context, req gen.TestTargetDraftReq
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.runTargetTest(ctx, req.Project, string(b.Kind), cfg, b.Example, b.DatasetId)
+	res, err := s.runTargetTest(ctx, req.Project, string(b.Kind), cfg, b.Example, b.DatasetId, b.Variables, b.Simulator)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (s *Server) TestTargetDraft(ctx context.Context, req gen.TestTargetDraftReq
 // runTargetTest builds an adapter (secrets resolved server-side), sends one sample example and
 // reports the redacted request, raw body, mapped response and per-path mapping matches.
 func (s *Server) runTargetTest(ctx context.Context, projectID uuid.UUID, kind string, cfg json.RawMessage,
-	ex *gen.ExampleData, datasetID *uuid.UUID) (gen.TargetTestResult, error) {
+	ex *gen.ExampleData, datasetID *uuid.UUID, vars *map[string]string, sim *gen.SimulatorConfig) (gen.TargetTestResult, error) {
 	proj, err := s.Store.GetProject(ctx, projectID)
 	if err != nil {
 		return gen.TargetTestResult{}, err
@@ -323,13 +323,27 @@ func (s *Server) runTargetTest(ctx context.Context, projectID uuid.UUID, kind st
 	if err := validateTargetConfig(kind, cfg); err != nil {
 		return gen.TargetTestResult{}, err
 	}
+	// {{ .vars.NAME }} references are filled from the request's variables, like a run does.
+	var vm map[string]string
+	if vars != nil {
+		vm = *vars
+	}
+	if cfg, err = targets.ApplyVariables(cfg, vm); err != nil {
+		return gen.TargetTestResult{}, fieldError("variables", "%v", err).with("kind", kind)
+	}
 	ad, err := targets.New(kind, cfg, s.targetDeps())
 	if err != nil {
 		return gen.TargetTestResult{}, fieldError("config", "%v", err).with("kind", kind)
 	}
 	tctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	rep := targets.TestConnection(tctx, ad, sample, targets.InvokeOptions{Secrets: s.secretResolver(ctx, proj)})
+	opts := targets.InvokeOptions{Secrets: s.secretResolver(ctx, proj)}
+	if sim != nil {
+		if opts.LLM, err = s.simulatorLLM(ctx, proj, sim); err != nil {
+			return gen.TargetTestResult{}, fieldError("simulator", "%v", err)
+		}
+	}
+	rep := targets.TestConnection(tctx, ad, sample, opts)
 	out := gen.TargetTestResult{Ok: rep.OK, LatencyMs: durMS(rep.Elapsed), Request: rawPtr(rep.Request),
 		RawResponse: rawPtr(rep.Raw)}
 	if rep.Error != "" {

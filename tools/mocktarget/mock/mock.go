@@ -12,8 +12,10 @@
 //	POST /chat                 {session_id?, message} -> {session_id, reply, turn, done}
 //	GET  /healthz
 //
-// Per-request overrides: ?mock_status=503, ?mock_latency_ms=250 (or the
-// X-Mock-Status / X-Mock-Latency-Ms headers).
+// Per-request overrides: ?mock_status=503, ?mock_latency_ms=250, ?mock_accuracy=0.9 and
+// ?mock_variant=v2 (or the X-Mock-Status / X-Mock-Latency-Ms / X-Mock-Accuracy / X-Mock-Variant
+// headers). A variant re-draws which questions are answered correctly, so two variants disagree
+// on some questions (regressions and improvements in a comparison).
 package mock
 
 import (
@@ -104,8 +106,26 @@ func IsCorrect(question string, accuracy float64) bool {
 	return float64(hash64("correct:"+question)%10000)/10000 < accuracy
 }
 
-func (s *server) answer(question, expected string) string {
-	if IsCorrect(question, s.cfg.Accuracy) {
+// IsCorrectVariant is IsCorrect for a named variant ("" is the default variant, same as IsCorrect).
+func IsCorrectVariant(question string, accuracy float64, variant string) bool {
+	if variant == "" {
+		return IsCorrect(question, accuracy)
+	}
+	return IsCorrect(variant+":"+question, accuracy)
+}
+
+// answer returns the mock's answer to question, honouring per-request accuracy/variant overrides.
+func (s *server) answer(r *http.Request, question, expected string) string {
+	acc, variant := s.cfg.Accuracy, firstNonEmpty(r.URL.Query().Get("mock_variant"), r.Header.Get("X-Mock-Variant"))
+	if v := firstNonEmpty(r.URL.Query().Get("mock_accuracy"), r.Header.Get("X-Mock-Accuracy")); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f >= 0 && f <= 1 {
+			acc = f
+			if f == 0 {
+				acc = -1
+			}
+		}
+	}
+	if IsCorrectVariant(question, acc, variant) {
 		if expected != "" {
 			return expected
 		}
@@ -354,7 +374,7 @@ func (s *server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content := s.answer(question, "")
+	content := s.answer(r, question, "")
 	if sawTool {
 		content = "Based on the tool result: " + content
 	}
@@ -451,13 +471,16 @@ func (s *server) rag(w http.ResponseWriter, r *http.Request) {
 	}
 	q := question(body, "")
 	expected, _ := body["expected"].(string)
-	ans := s.answer(q, expected)
+	ans := s.answer(r, q, expected)
 	docs := []map[string]any{
 		{"id": "doc-gold", "text": fmt.Sprintf("Regarding %q: %s", q, Truth(q)), "score": 0.93},
 		{"id": "doc-2", "text": "Unrelated reference material about " + strings.ToLower(q[:min(len(q), 24)]), "score": 0.41},
 		{"id": "doc-3", "text": "General background document.", "score": 0.22},
 	}
-	writeJSON(w, 200, map[string]any{"answer": ans, "context": docs, "usage": usage{tokens(q) + 60, tokens(ans)}})
+	u := usage{tokens(q) + 60, tokens(ans)}
+	// Priced like a small hosted model ($0.15 / $0.60 per million input / output tokens).
+	cost := (float64(u.InputTokens)*0.15 + float64(u.OutputTokens)*0.60) / 1e6
+	writeJSON(w, 200, map[string]any{"answer": ans, "context": docs, "usage": u, "cost_usd": cost})
 }
 
 func (s *server) agent(w http.ResponseWriter, r *http.Request) {
@@ -468,7 +491,7 @@ func (s *server) agent(w http.ResponseWriter, r *http.Request) {
 	}
 	q := question(body, "")
 	expected, _ := body["expected"].(string)
-	ans := s.answer(q, expected)
+	ans := s.answer(r, q, expected)
 	args := map[string]string{"query": q}
 	result := Truth(q)
 	writeJSON(w, 200, map[string]any{
@@ -510,9 +533,9 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	case done:
 		reply = "Goodbye! Glad I could help."
 	case turn == 0:
-		reply = "Hello! " + s.answer(body.Message, "")
+		reply = "Hello! " + s.answer(r, body.Message, "")
 	default:
-		reply = fmt.Sprintf("(turn %d) %s", turn+1, s.answer(body.Message, ""))
+		reply = fmt.Sprintf("(turn %d) %s", turn+1, s.answer(r, body.Message, ""))
 	}
 	u := usage{tokens(body.Message), tokens(reply)}
 	if m := r.URL.Query().Get("stream"); m == "sse" || m == "ndjson" {

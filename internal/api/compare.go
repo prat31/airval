@@ -277,7 +277,17 @@ func (s *Server) CompareRuns(ctx context.Context, req gen.CompareRunsRequestObje
 	if e := req.Params.EvaluatorId; e != nil {
 		chosen = e.String()
 	} else if len(common) > 0 {
+		// Default to the evaluator that moved most (an unchanged one makes an empty scatter and
+		// regression list); ties keep name order.
 		chosen = common[0]
+		best := -1.0
+		if len(cmps) > 1 && cmps[1] != nil {
+			for _, id := range common {
+				if ec, ok := cmps[1].Evaluator(id); ok && ec.Paired > 0 && math.Abs(ec.MeanDelta) > best+1e-12 {
+					chosen, best = id, math.Abs(ec.MeanDelta)
+				}
+			}
+		}
 	}
 
 	// Scorecard: one row per evaluator, then run-level metrics.

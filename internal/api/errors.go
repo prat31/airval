@@ -35,7 +35,7 @@ func badRequest(format string, args ...any) *Error {
 }
 
 func invalid(format string, args ...any) *Error {
-	return errorf(http.StatusUnprocessableEntity, "validation_failed", format, args...)
+	return errorf(http.StatusBadRequest, "validation_failed", format, args...)
 }
 
 func notFound(what string) *Error {

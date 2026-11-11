@@ -10,7 +10,7 @@
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Outlet, redirect } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { EntryRedirect, OrgIndexRedirect, WorkspaceGate } from './features/auth/guard'
-import { OnboardingScreen } from './features/auth/onboarding'
+import { OnboardingScreen, validateOnboardingSearch } from './features/auth/onboarding'
 import { AuthLayout, LoginScreen, SetupScreen } from './features/auth/screens'
 import { CompareScreen } from './features/compare/compare'
 import { validateCompareSearch } from './features/compare/search'
@@ -53,7 +53,7 @@ const onboardingRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/onboarding',
   component: OnboardingScreen,
-  validateSearch: (s: Record<string, unknown>): { org?: string } => (typeof s.org === 'string' ? { org: s.org } : {}),
+  validateSearch: validateOnboardingSearch,
 })
 
 // Organization → first project.

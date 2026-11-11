@@ -37,7 +37,7 @@ func (s *Server) planner() *planner.Service {
 	return p.(*planner.Service)
 }
 
-// engineErr maps planner validation errors to 422s.
+// engineErr maps planner validation errors to 400 validation_failed.
 func engineErr(err error) error {
 	var ie *planner.InvalidError
 	if errors.As(err, &ie) {

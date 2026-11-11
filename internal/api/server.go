@@ -56,6 +56,7 @@ type Server struct {
 	auditSinks   []func(context.Context, store.AuditEntry)
 	ssoProviders []string
 	extRoutes    []func(chi.Router)
+	listenAddr   string
 }
 
 var _ gen.StrictServerInterface = (*Server)(nil)
@@ -114,6 +115,10 @@ func (s *Server) Handler() http.Handler {
 	r.Get("/readyz", s.handleReadyz)
 	if s.Config == nil || s.Config.Telemetry.Metrics {
 		r.Handle("/metrics", s.Metrics.Handler())
+	}
+	// Built-in mock AI service (sample project, docs, smoke tests).
+	if s.mockEnabled() {
+		r.Mount("/_mock", http.StripPrefix("/_mock", s.mockHandler()))
 	}
 	// Inbound webhooks authenticate by HMAC, not sessions.
 	r.Post("/hooks/{trigger}", s.handleHook)

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Activity, ArrowRight, CircleCheck, CircleDollarSign, CircleX, Gauge, LayoutDashboard, Layers, Play, RotateCw, Target } from 'lucide-react'
+import { Activity, ArrowRight, CircleCheck, CircleDollarSign, CircleX, Gauge, LayoutDashboard, Layers, Play, RotateCw, Target, Wand2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Screen } from '@/app/screen'
 import { useWorkspace } from '@/app/workspace'
@@ -15,6 +15,7 @@ import { StatTile } from '@/components/ui/stat-tile'
 import { formatCompact, formatDelta, formatPercent, formatRelative, formatUsd } from '@/lib/format'
 import { indexById, isActive, overviewQuery, runsQuery, suitesQuery, targetsQuery, trendsQuery } from '@/features/runs/api'
 import { RunSuiteDialog } from '@/features/runs/run-suite-dialog'
+import { LoadSampleButton } from '@/features/auth/sample-project'
 import { PassRateBar, ProgressBar, RunStatusPill, runTitle, TriggerIcon } from '@/features/runs/ui'
 
 const DAY = 86_400_000
@@ -77,11 +78,15 @@ export function OverviewScreen() {
               </Button>
             }
             secondaryAction={
-              <Button variant="ghost" asChild>
-                <Link to="/o/$org/p/$project/targets" params={params}>
-                  Connect a target first
-                </Link>
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button variant="ghost" asChild>
+                  <Link to="/onboarding" search={{ org: org.slug, project: project?.slug, step: 1 }}>
+                    <Wand2 />
+                    Guided setup
+                  </Link>
+                </Button>
+                <LoadSampleButton orgId={org.id} orgSlug={org.slug} />
+              </div>
             }
           />
         </Card>

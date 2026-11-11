@@ -144,7 +144,7 @@ func TestAPIEndToEnd(t *testing.T) {
 	if n := tg["current_version"].(obj)["number"].(float64); n != 2 {
 		t.Fatalf("target version %v", n)
 	}
-	owner.do("POST", "/v1/projects/"+pid+"/targets", obj{"name": "bad", "kind": "nope", "config": obj{}}, 422, nil)
+	owner.do("POST", "/v1/projects/"+pid+"/targets", obj{"name": "bad", "kind": "nope", "config": obj{}}, 400, nil)
 
 	// Datasets: upsert, publish, export.
 	var ds obj
@@ -159,7 +159,7 @@ func TestAPIEndToEnd(t *testing.T) {
 	if up["count"].(float64) != 3 {
 		t.Fatal("upsert count")
 	}
-	owner.do("POST", "/v1/datasets/"+did+"/examples", obj{"examples": []obj{{"input": "not an object"}}}, 422, nil)
+	owner.do("POST", "/v1/datasets/"+did+"/examples", obj{"examples": []obj{{"input": "not an object"}}}, 400, nil)
 	var ver obj
 	owner.do("POST", "/v1/datasets/"+did+"/versions", obj{"note": "v1"}, 201, &ver)
 	if ver["number"].(float64) != 1 || ver["example_count"].(float64) != 3 {
@@ -207,7 +207,7 @@ func TestAPIEndToEnd(t *testing.T) {
 	if trig["next_fire_at"] == nil {
 		t.Fatal("next_fire_at not computed")
 	}
-	owner.do("POST", "/v1/suites/"+sid+"/triggers", obj{"kind": "schedule", "config": obj{"cron": "nope"}}, 422, nil)
+	owner.do("POST", "/v1/suites/"+sid+"/triggers", obj{"kind": "schedule", "config": obj{"cron": "nope"}}, 400, nil)
 	var wh obj
 	owner.do("POST", "/v1/suites/"+sid+"/triggers", obj{"kind": "webhook"}, 201, &wh)
 	if !strings.HasPrefix(wh["webhook_secret"].(string), "whsec_") || !strings.HasPrefix(wh["webhook_url"].(string), "http://airval.test/hooks/") {

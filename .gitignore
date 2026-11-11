@@ -11,3 +11,5 @@ coverage.out
 
 .claude/worktrees/
 deploy/helm/airval/charts/*.tgz
+web/e2e-results/
+web/e2e-report/

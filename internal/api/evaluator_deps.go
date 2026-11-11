@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/prat31/airval/internal/api/gen"
 	"github.com/prat31/airval/internal/evalcore"
 	"github.com/prat31/airval/internal/evaluators"
 	"github.com/prat31/airval/internal/store"
@@ -27,6 +28,24 @@ func validateEvaluatorConfig(kind string, cfg json.RawMessage) error {
 		return fieldError("config", "%v", err).with("kind", kind)
 	}
 	return nil
+}
+
+// simulatorLLM builds the user simulator for testing a simulated conversation.
+func (s *Server) simulatorLLM(ctx context.Context, proj store.Project, sim *gen.SimulatorConfig) (evalcore.LLM, error) {
+	provider := string(sim.Provider)
+	switch provider {
+	case "openai", "anthropic", "vertex":
+	default:
+		return nil, fmt.Errorf("simulator provider %q is not supported (use openai, anthropic or vertex)", provider)
+	}
+	cfg := map[string]any{"model": sim.Model}
+	if sec := deref(sim.Secret, ""); sec != "" {
+		cfg["api_key"] = "{{ secret " + strconv.Quote(sec) + " }}"
+	}
+	if u := deref(sim.BaseUrl, ""); u != "" {
+		cfg["base_url"] = u
+	}
+	return targets.NewLLM(provider, mustJSON(cfg), s.targetDeps(), s.secretResolver(ctx, proj))
 }
 
 // evaluatorDeps wires model-based evaluators: judges call the provider named in their config

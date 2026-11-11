@@ -280,7 +280,7 @@ func (w *Engine) callTarget(ctx context.Context, sh *shard, ex *evalcore.Example
 			}
 		}
 	}
-	opts := targets.InvokeOptions{Secrets: rs.resolver, Trial: trial}
+	opts := targets.InvokeOptions{Secrets: rs.resolver, Trial: trial, LLM: rs.simulator}
 	var lastErr error
 	for attempt := 1; ; attempt++ {
 		if err := rs.lim.Acquire(ctx); err != nil {

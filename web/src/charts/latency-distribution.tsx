@@ -3,7 +3,7 @@ import { ChartFrame, EChart, type ChartFrameProps } from './chart'
 import type { EChartsOption } from './echarts'
 import type { CustomApi } from './histogram'
 import { seriesColor, tooltipRow, tooltipTitle, type ChartTokens } from './theme'
-import { binValues, formatValue, quantile } from './util'
+import { binValues, edgeAlign, formatValue, quantile } from './util'
 
 export interface LatencyDistributionProps extends Omit<ChartFrameProps, 'children' | 'table'> {
   /** Latencies in milliseconds. */
@@ -31,7 +31,12 @@ export function LatencyDistribution({ values, bins = 30, clipQuantile = 0.995, h
   const option = useMemo(
     () =>
       (t: ChartTokens): EChartsOption => {
-        const marker = (name: string, value: number, strong: boolean) => ({
+        // Rules closer than ~15% of the axis would print overlapping labels: keep the line, drop the label
+        // (the subtitle and data table carry every value).
+        const near = (a: number, b: number) => Math.abs(a - b) < 0.15 * (stats.max || 1)
+        const showP95 = !near(stats.p95, stats.p50) && !near(stats.p95, stats.p99)
+        const showP99 = !near(stats.p99, stats.p50)
+        const marker = (name: string, value: number, strong: boolean, show = true) => ({
           xAxis: value,
           name,
           lineStyle: { color: strong ? t.text : t.text2, type: strong ? ('solid' as const) : ([4, 3] as number[]), width: 1 },
@@ -42,6 +47,8 @@ export function LatencyDistribution({ values, bins = 30, clipQuantile = 0.995, h
             fontWeight: strong ? 600 : 400,
             position: 'end' as const,
             distance: 4,
+            show,
+            align: edgeAlign(value, [0, stats.max || 1]),
           },
         })
         return {
@@ -83,7 +90,7 @@ export function LatencyDistribution({ values, bins = 30, clipQuantile = 0.995, h
               markLine: {
                 silent: true,
                 symbol: 'none',
-                data: [marker('p50', stats.p50, true), marker('p95', stats.p95, false), marker('p99', stats.p99, false)],
+                data: [marker('p50', stats.p50, true), marker('p95', stats.p95, false, showP95), marker('p99', stats.p99, false, showP99)],
               },
             },
           ] as EChartsOption['series'],

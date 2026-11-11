@@ -140,7 +140,7 @@ func runConversation(ctx context.Context, call turnFunc, ex evalcore.Example, op
 
 func runSimulated(ctx context.Context, st *convState, call turnFunc, ex evalcore.Example, opts InvokeOptions, sim *evalcore.Simulation) error {
 	if opts.LLM == nil {
-		return permanent("simulated conversation requires a user-simulator LLM (InvokeOptions.LLM)")
+		return permanent("simulated conversation requires a user simulator: set the suite's simulator (provider, model, secret)")
 	}
 	maxTurns := sim.MaxTurns
 	if maxTurns <= 0 {

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { ChartFrame, EChart, type ChartFrameProps } from './chart'
 import type { EChartsOption } from './echarts'
 import { seriesColor, tooltipRow, tooltipTitle, type ChartTokens } from './theme'
-import { binValues, formatValue, type Bin } from './util'
+import { binValues, edgeAlign, formatValue, type Bin } from './util'
 
 export interface HistogramSeries {
   name: string
@@ -83,7 +83,15 @@ export function Histogram({ series, bins = 20, domain = [0, 1], threshold, forma
                     silent: true,
                     symbol: 'none',
                     lineStyle: { color: t.text2, type: [4, 3], width: 1 },
-                    label: { formatter: `threshold ${formatValue(threshold, format)}`, color: t.text2, fontSize: 11, position: 'end', distance: 4 },
+                    label: {
+                      formatter: `threshold ${formatValue(threshold, format)}`,
+                      color: t.text2,
+                      fontSize: 11,
+                      position: 'end',
+                      distance: 4,
+                      // Keep the label inside the plot when the rule sits near an edge.
+                      align: edgeAlign(threshold, domain),
+                    },
                     data: [{ xAxis: threshold }],
                   }
                 : undefined,

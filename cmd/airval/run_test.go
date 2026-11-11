@@ -43,7 +43,8 @@ func TestRunCLI(t *testing.T) {
 		t.Fatalf("summary: %s", out)
 	}
 	mdb, _ := os.ReadFile(md)
-	if !strings.Contains(string(mdb), "| Gate | Result |") || !strings.Contains(string(mdb), "failing result") {
+	if !strings.Contains(string(mdb), "| Gate | Result |") || !strings.Contains(string(mdb), "failing result") ||
+		!strings.Contains(string(mdb), ">= 0.5`") || strings.Contains(string(mdb), "&gt;") {
 		t.Fatalf("markdown: %s", mdb)
 	}
 	var js struct {

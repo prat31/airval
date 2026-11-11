@@ -26,6 +26,7 @@ func (s *Server) GetMeta(ctx context.Context, _ gen.GetMetaRequestObject) (gen.G
 	m.Features.AuditLog = true
 	if s.Config != nil {
 		m.Features.Signup = ptr(s.Config.Auth.AllowSignup)
+		m.Features.SampleProject = ptr(s.mockEnabled())
 	}
 	return gen.GetMeta200JSONResponse(m), nil
 }

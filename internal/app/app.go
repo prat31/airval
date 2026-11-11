@@ -155,6 +155,7 @@ func (a *App) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		a.API.SetListenAddr(ln.Addr().String())
 		a.Logger.Info("airval listening", "addr", ln.Addr().String(), "url", a.Config.Server.BaseURL, "mode", a.Mode,
 			"db", a.Store.Dialect(), "nats_embedded", a.Queue.Embedded(), "version", a.Build.Version)
 		g.Go(func() error {

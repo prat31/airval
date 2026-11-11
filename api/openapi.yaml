@@ -12,7 +12,8 @@ info:
     **Pagination.** List endpoints are cursor-based: pass `cursor` (from `next_cursor`) and `limit` (1–1000, default 50).
     `next_cursor` is null on the last page.
 
-    **Errors.** Non-2xx responses carry an `Error` body (`code`, `message`, optional `details`).
+    **Errors.** Non-2xx responses carry an `Error` body (`code`, `message`, optional `details`). Invalid input is always
+    `400` with code `validation_failed` (or `bad_request` for unparseable bodies); `details.field` names the offending field.
 
     **Roles.** owner > admin > editor > viewer. Viewers read; editors create/edit/run; admins manage members, keys,
     secrets and notification channels; owners can delete the organization.
@@ -403,6 +404,22 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/ProjectCreate" } } }
       responses:
         "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Project" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/projects:sample:
+    post:
+      tags: [projects]
+      operationId: createSampleProject
+      summary: Load the sample project (editor)
+      description: |
+        Creates a ready-to-explore project backed by the built-in mock AI service (`/_mock/`, see `server.mock_target`):
+        two targets (prod and candidate), a 1,000-example support dataset with known answers, a RAG dataset, deterministic
+        evaluators, a suite with gates and two finished runs (the first is pinned as the suite baseline). Waits for both runs
+        to finish (up to about a minute). 409 `mock_disabled` when the mock service is turned off.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SampleProjectRequest" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/SampleProject" } } } }
         default: { $ref: "#/components/responses/Error" }
   /v1/projects/{project}:
     parameters: [{ $ref: "#/components/parameters/ProjectID" }]
@@ -1313,6 +1330,7 @@ components:
             sso_providers: { type: array, items: { type: string } }
             audit_log: { type: boolean }
             signup: { type: boolean }
+            sample_project: { type: boolean, description: The built-in mock AI service is enabled, so the sample project can be loaded }
     IDList:
       type: object
       required: [ids]
@@ -1602,6 +1620,21 @@ components:
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/Project" } }
         next_cursor: { type: string, nullable: true }
+    SampleProjectRequest:
+      type: object
+      required: [org_id]
+      properties:
+        org_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, description: "Project name (default: Sample · Support Copilot)" }
+    SampleProject:
+      type: object
+      required: [project, suite_id, target_ids, dataset_ids, run_ids]
+      properties:
+        project: { $ref: "#/components/schemas/Project" }
+        suite_id: { type: string, format: uuid }
+        target_ids: { type: array, items: { type: string, format: uuid } }
+        dataset_ids: { type: array, items: { type: string, format: uuid } }
+        run_ids: { type: array, items: { type: string, format: uuid }, description: Baseline run first }
     ProjectCreate:
       type: object
       required: [org_id, name]
@@ -1758,14 +1791,17 @@ components:
             access_token: { type: string }
             tools: { type: array, items: { $ref: "#/components/schemas/JSONObject" } }
             extra_body: { $ref: "#/components/schemas/JSONObject" }
-    ConversationConfig:
+    SimulatorConfig:
       type: object
-      additionalProperties: true
-      description: How multi-turn state is carried between turns
+      required: [provider, model]
+      description: |
+        The LLM that plays the user in simulated conversations. Multi-turn state is carried by the target config
+        itself: templates see `.messages`, `.message`, `.turn` and `.session` (see `session.path`).
       properties:
-        state: { type: string, enum: [messages, session_id], default: messages }
-        messages_variable: { type: string, default: messages, description: "Template variable holding the messages array" }
-        simulator: { $ref: "#/components/schemas/JudgeModelConfig" }
+        provider: { type: string, enum: [openai, anthropic, vertex] }
+        model: { type: string, minLength: 1 }
+        secret: { type: string, description: Name of the Secret holding the provider API key }
+        base_url: { type: string, description: "Override the provider endpoint (OpenAI-compatible gateways, self-hosted models)" }
     TargetLimits:
       type: object
       additionalProperties: true
@@ -1835,6 +1871,7 @@ components:
         example: { $ref: "#/components/schemas/ExampleData" }
         dataset_id: { type: string, format: uuid, description: Use the first example of this dataset (draft) as the sample }
         variables: { type: object, additionalProperties: { type: string } }
+        simulator: { $ref: "#/components/schemas/SimulatorConfig" }
     TargetDraftTestRequest:
       type: object
       required: [kind, config]
@@ -1844,6 +1881,7 @@ components:
         example: { $ref: "#/components/schemas/ExampleData" }
         dataset_id: { type: string, format: uuid }
         variables: { type: object, additionalProperties: { type: string } }
+        simulator: { $ref: "#/components/schemas/SimulatorConfig" }
     TargetTestResult:
       type: object
       required: [ok, latency_ms]
@@ -2254,7 +2292,7 @@ components:
         category: { type: string, enum: [deterministic, model, human] }
         group: { type: string }
         description: { type: string }
-        cost: { type: string, description: "free | cheap | moderate | expensive" }
+        cost: { type: string, enum: [free, model, human], description: "free: pure computation; model: calls an LLM or embedding model; human: waits for a reviewer" }
         default_threshold: { type: number, format: double }
         config_schema: { $ref: "#/components/schemas/JSONObject" }
         apply_to: { type: array, items: { $ref: "#/components/schemas/ApplyTo" } }
@@ -2328,7 +2366,18 @@ components:
         limits: { $ref: "#/components/schemas/TargetLimits" }
         cache: { type: object, properties: { target: { type: boolean, default: false }, judges: { type: boolean, default: true } } }
         baseline: { $ref: "#/components/schemas/BaselinePolicy" }
-        failure_budget: { type: object, properties: { critical_failures: { type: integer, description: Cancel the run early after this many critical failures } } }
+        failure_budget:
+          type: object
+          description: Cancel the run early once any limit is exceeded (unset = unlimited)
+          properties:
+            critical_failures: { type: integer, minimum: 0, description: Max results with a failed critical evaluator }
+            failures: { type: integer, minimum: 0, description: Max failed results }
+            errors: { type: integer, minimum: 0, description: Max errored results }
+            fail_rate: { type: number, format: double, minimum: 0, maximum: 1, description: Max share of failed results, checked once min_results are in }
+            min_results: { type: integer, minimum: 1, default: 50, description: Results needed before fail_rate is checked }
+        simulator:
+          allOf: [{ $ref: "#/components/schemas/SimulatorConfig" }]
+          description: LLM that plays the user in simulated multi-turn examples (`conversation.simulation`)
         timeout_seconds: { type: integer }
         variables: { type: object, additionalProperties: { type: string } }
     Suite:

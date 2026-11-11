@@ -127,7 +127,7 @@ func (s *Server) GetEvaluatorCatalog(ctx context.Context, _ gen.GetEvaluatorCata
 	items := make([]gen.EvaluatorKindInfo, 0, len(cat))
 	for _, k := range cat {
 		info := gen.EvaluatorKindInfo{Kind: k.Kind, Name: k.Name, Category: gen.EvaluatorKindInfoCategory(k.Category), Group: k.Group,
-			Description: k.Description, Cost: k.Cost.String(), DefaultThreshold: k.DefaultThreshold,
+			Description: k.Description, Cost: gen.EvaluatorKindInfoCost(k.Cost.String()), DefaultThreshold: k.DefaultThreshold,
 			ConfigSchema: rawOr(k.ConfigSchema, "{}"), ApplyTo: mapSlice(k.ApplyTo, func(a evalcore.ApplyTo) gen.ApplyTo { return gen.ApplyTo(a) })}
 		if len(k.Requires) > 0 {
 			info.Requires = &k.Requires

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -256,8 +257,33 @@ func oneLine(s string, n int) string {
 	return trunc(s, n)
 }
 
+// htmlTagStart matches "<" opening an HTML tag or comment; comparisons such as "a < b" stay readable.
+var htmlTagStart = regexp.MustCompile(`<([A-Za-z/!?])`)
+
+// mdEscape makes s safe inside a GitHub-flavored markdown table cell. Comparison operators
+// (>=, <, ...) are left as-is; only "<" starting an HTML tag is escaped.
 func mdEscape(s string) string {
-	return strings.NewReplacer("|", "\\|", "\n", " ", "<", "&lt;", ">", "&gt;").Replace(s)
+	s = strings.NewReplacer("|", "\\|", "\r\n", " ", "\n", " ").Replace(s)
+	return htmlTagStart.ReplaceAllString(s, "&lt;$1")
+}
+
+// mdCode renders s as inline code inside a table cell (gate expressions).
+func mdCode(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "`" + strings.NewReplacer("`", "'", "|", "\\|", "\n", " ").Replace(s) + "`"
+}
+
+// mdGate renders a gate as "Name: `expr`" for the markdown gate table.
+func mdGate(g gateResult) string {
+	switch {
+	case g.Name != "" && g.Text != "":
+		return mdEscape(g.Name) + ": " + mdCode(g.Text)
+	case g.Name != "":
+		return mdEscape(g.Name)
+	}
+	return mdCode(g.Text)
 }
 
 // renderMarkdown renders a PR-comment summary of the runs.
@@ -282,7 +308,7 @@ func renderMarkdown(reports []runReport) []byte {
 				if !g.Passed {
 					res = "❌ fail"
 				}
-				fmt.Fprintf(&b, "| %s | %s | %s |\n", mdEscape(gateLabel(g)), res, mdEscape(g.Detail))
+				fmt.Fprintf(&b, "| %s | %s | %s |\n", mdGate(g), res, mdEscape(g.Detail))
 			}
 			b.WriteString("\n")
 		}

@@ -33,7 +33,7 @@ export function defaultConfig(kind: TargetKind): Obj {
         method: 'POST',
         url: '',
         headers: { 'Content-Type': 'application/json' },
-        body: '{\n  "question": "{{ .input.question }}"\n}',
+        body: '{\n  "question": {{ json .input.question }}\n}',
         response: { output: '$.answer' },
         timeout_ms: 60000,
       }
@@ -42,7 +42,7 @@ export function defaultConfig(kind: TargetKind): Obj {
         method: 'POST',
         url: '',
         headers: { 'Content-Type': 'application/json' },
-        body: '{\n  "input": "{{ .input.question }}"\n}',
+        body: '{\n  "input": {{ json .input.question }}\n}',
         response: { output: '$.output', trace: { path: '$.steps' } },
         timeout_ms: 120000,
       }

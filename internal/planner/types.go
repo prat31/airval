@@ -36,6 +36,7 @@ type RunConfig struct {
 	Limits            Limits            `json:"limits"`
 	Cache             CachePolicy       `json:"cache"`
 	FailureBudget     *FailureBudget    `json:"failure_budget,omitempty"`
+	Simulator         *Simulator        `json:"simulator,omitempty"`
 	TimeoutSeconds    int               `json:"timeout_seconds,omitempty"`
 	Variables         map[string]string `json:"variables,omitempty"`
 	SourceRunID       *uuid.UUID        `json:"source_run_id,omitempty"`
@@ -98,8 +99,21 @@ type CachePolicy struct {
 }
 
 // FailureBudget stops a doomed run early.
+// Simulator is the LLM playing the user in simulated conversations.
+type Simulator struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	Secret   string `json:"secret,omitempty"`
+	BaseURL  string `json:"base_url,omitempty"`
+}
+
+// FailureBudget cancels a run early once a limit is exceeded (nil = unlimited).
 type FailureBudget struct {
-	CriticalFailures *int `json:"critical_failures,omitempty"`
+	CriticalFailures *int     `json:"critical_failures,omitempty"`
+	Failures         *int     `json:"failures,omitempty"`
+	Errors           *int     `json:"errors,omitempty"`
+	FailRate         *float64 `json:"fail_rate,omitempty"`   // 0..1, checked once MinResults results are in
+	MinResults       int      `json:"min_results,omitempty"` // default 50
 }
 
 // ShardPayload is the queue.Job payload of an execute/rescore shard.
@@ -116,7 +130,7 @@ type Item struct {
 	S *uuid.UUID `json:"s,omitempty"`
 }
 
-// InvalidError is a user-facing validation error (the API answers 422).
+// InvalidError is a user-facing validation error (the API answers 400 validation_failed).
 type InvalidError struct{ Msg string }
 
 func (e *InvalidError) Error() string { return e.Msg }

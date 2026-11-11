@@ -78,6 +78,28 @@ export function useCreateProject() {
   })
 }
 
+export const metaQuery = queryOptions({
+  queryKey: ['meta'] as const,
+  queryFn: () => unwrap(api.GET('/v1/meta')),
+  staleTime: 10 * 60_000,
+})
+
+/**
+ * One-click sample project: targets on the built-in mock service, a 1,000-example dataset, a gated
+ * suite and two finished runs. The request waits for both runs (a few seconds).
+ */
+export function useLoadSample() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (orgId: string) => unwrap(api.POST('/v1/projects:sample', { body: { org_id: orgId } })),
+    onSuccess: (s) => {
+      qc.setQueryData<ApiProject[]>(authKeys.projects(s.project.org_id), (old) => (old ? [...old, s.project] : old))
+      void qc.invalidateQueries({ queryKey: authKeys.projects(s.project.org_id) })
+    },
+    onError: () => {},
+  })
+}
+
 export function useCreateOrg() {
   const qc = useQueryClient()
   return useMutation({

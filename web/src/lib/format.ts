@@ -5,11 +5,16 @@ const pct1 = nf({ style: 'percent', minimumFractionDigits: 1, maximumFractionDig
 const compact = nf({ notation: 'compact', maximumFractionDigits: 1 })
 const usd = nf({ style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
 const usdSmall = nf({ style: 'currency', currency: 'USD', maximumFractionDigits: 4 })
+const usdTiny = nf({ style: 'currency', currency: 'USD', maximumSignificantDigits: 2 })
 
 export const formatPercent = (v: number, digits: 0 | 1 = 1) => (digits === 0 ? pct0 : pct1).format(v)
 export const formatScore = (v: number) => v.toFixed(2)
 export const formatCompact = (v: number) => compact.format(v)
-export const formatUsd = (v: number) => (Math.abs(v) < 1 && v !== 0 ? usdSmall : usd).format(v)
+/** USD with precision that suits the magnitude: $12.34, $0.0132, $0.000012 (per-call costs). */
+export const formatUsd = (v: number) => {
+  const a = Math.abs(v)
+  return (a === 0 || a >= 1 ? usd : a >= 0.01 ? usdSmall : usdTiny).format(v)
+}
 
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)} ms`

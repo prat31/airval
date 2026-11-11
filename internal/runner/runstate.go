@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -32,6 +31,7 @@ type runState struct {
 	run           store.Run
 	cfg           planner.RunConfig
 	adapter       targets.Adapter
+	simulator     evalcore.LLM // plays the user in simulated conversations (nil = none configured)
 	pipeline      *evaluators.Pipeline
 	evalInfos     []aggregate.EvaluatorInfo
 	needsBaseline bool
@@ -63,31 +63,10 @@ func (s *syncResolver) Resolve(name string) (string, error) {
 	return s.r.Resolve(name)
 }
 
-var varRef = regexp.MustCompile(`\{\{\s*\.?vars\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
-
-// applyVariables substitutes {{ .vars.NAME }} references anywhere in a raw target config
-// (templates and plain fields such as base_url) with run variables (suite variables, overridden
-// by run/webhook variables). Values are JSON-escaped since they land inside JSON strings.
+// applyVariables substitutes {{ .vars.NAME }} references in a raw target config with run variables
+// (suite variables, overridden by run/webhook variables). See targets.ApplyVariables.
 func applyVariables(raw json.RawMessage, vars map[string]string) (json.RawMessage, error) {
-	if !varRef.Match(raw) {
-		return raw, nil
-	}
-	var missing []string
-	out := varRef.ReplaceAllFunc(raw, func(m []byte) []byte {
-		name := string(varRef.FindSubmatch(m)[1])
-		v, ok := vars[name]
-		if !ok {
-			missing = append(missing, name)
-			return nil
-		}
-		b, _ := json.Marshal(v)
-		return b[1 : len(b)-1]
-	})
-	if len(missing) > 0 {
-		slices.Sort(missing)
-		return nil, fmt.Errorf("target config references unset variable(s): %s", strings.Join(slices.Compact(missing), ", "))
-	}
-	return out, nil
+	return targets.ApplyVariables(raw, vars)
 }
 
 // state returns the cached runState of runID, building it on first use.
@@ -143,6 +122,13 @@ func (w *Engine) build(ctx context.Context, rs *runState) error {
 	cfg := rs.cfg
 	// Evaluators.
 	deps := evaluators.Deps{LLMs: w.judges.factory(rs.resolver), Embedders: w.judges.embedderFactory(rs.resolver)}
+	if sim := cfg.Simulator; sim != nil && sim.Provider != "" {
+		l, err := w.judges.simulator(rs.resolver, sim.Provider, sim.Model, sim.Secret, sim.BaseURL)
+		if err != nil {
+			return fmt.Errorf("conversation simulator: %w", err)
+		}
+		rs.simulator = l
+	}
 	if cfg.Cache.Judges && w.cache != nil {
 		deps.Cache = w.cache
 	}
@@ -171,8 +157,9 @@ func (w *Engine) build(ctx context.Context, rs *runState) error {
 
 	// Failure budget: explicit, plus (for CI triggers) limits implied by count(...) gate clauses.
 	var budget aggregate.FailureBudget
-	if cfg.FailureBudget != nil && cfg.FailureBudget.CriticalFailures != nil {
-		budget.MaxCriticalFails = cfg.FailureBudget.CriticalFailures
+	if fb := cfg.FailureBudget; fb != nil {
+		budget = aggregate.FailureBudget{MaxCriticalFails: fb.CriticalFailures, MaxFails: fb.Failures, MaxErrors: fb.Errors,
+			MaxFailRate: fb.FailRate, MinResults: fb.MinResults}
 	}
 	if rs.run.TriggerKind == "api" || rs.run.TriggerKind == "webhook" {
 		for _, g := range cfg.Gates {

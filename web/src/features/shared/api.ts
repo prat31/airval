@@ -5,7 +5,7 @@
  * (Same CSRF + error normalization as `@/lib/api/client`.)
  */
 import createClient, { type Middleware } from 'openapi-fetch'
-import { ApiError, readCookie, toApiError } from '@/lib/api/client'
+import { ApiError, querySerializer, readCookie, toApiError } from '@/lib/api/client'
 import type { components, paths } from '@/lib/api/schema'
 
 export { ApiError, unwrap } from '@/lib/api/client'
@@ -32,7 +32,7 @@ const errors: Middleware = {
   },
 }
 
-export const http = createClient<paths>({ baseUrl: '', credentials: 'include', headers: { Accept: 'application/json' } })
+export const http = createClient<paths>({ baseUrl: '', credentials: 'include', headers: { Accept: 'application/json' }, querySerializer })
 http.use(csrf, errors)
 
 /** Raw fetch with CSRF + ApiError normalization (multipart uploads, file downloads, endpoints not yet in the schema). */

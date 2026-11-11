@@ -426,6 +426,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects:sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Load the sample project (editor)
+         * @description Creates a ready-to-explore project backed by the built-in mock AI service (`/_mock/`, see `server.mock_target`):
+         *     two targets (prod and candidate), a 1,000-example support dataset with known answers, a RAG dataset, deterministic
+         *     evaluators, a suite with gates and two finished runs (the first is pinned as the suite baseline). Waits for both runs
+         *     to finish (up to about a minute). 409 `mock_disabled` when the mock service is turned off.
+         */
+        post: operations["createSampleProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects/{project}": {
         parameters: {
             query?: never;
@@ -1439,6 +1462,8 @@ export interface components {
                 sso_providers?: string[];
                 audit_log: boolean;
                 signup?: boolean;
+                /** @description The built-in mock AI service is enabled */
+                sample_project?: boolean;
             };
         };
         IDList: {
@@ -1713,6 +1738,21 @@ export interface components {
             items: components["schemas"]["Project"][];
             next_cursor?: string | null;
         };
+        SampleProjectRequest: {
+            /** Format: uuid */
+            org_id: string;
+            /** @description Project name (default: Sample · Support Copilot) */
+            name?: string;
+        };
+        SampleProject: {
+            project: components["schemas"]["Project"];
+            /** Format: uuid */
+            suite_id: string;
+            target_ids: string[];
+            dataset_ids: string[];
+            /** @description Baseline run first */
+            run_ids: string[];
+        };
         ProjectCreate: {
             /** Format: uuid */
             org_id: string;
@@ -1884,21 +1924,18 @@ export interface components {
             tools?: components["schemas"]["JSONObject"][];
             extra_body?: components["schemas"]["JSONObject"];
         };
-        /** @description How multi-turn state is carried between turns */
-        ConversationConfig: {
-            /**
-             * @default messages
-             * @enum {string}
-             */
-            state: "messages" | "session_id";
-            /**
-             * @description Template variable holding the messages array
-             * @default messages
-             */
-            messages_variable: string;
-            simulator?: components["schemas"]["JudgeModelConfig"];
-        } & {
-            [key: string]: unknown;
+        /**
+         * @description The LLM that plays the user in simulated conversations. Multi-turn state is carried by the target config
+         *     itself: templates see `.messages`, `.message`, `.turn` and `.session` (see `session.path`).
+         */
+        SimulatorConfig: {
+            /** @enum {string} */
+            provider: "openai" | "anthropic" | "vertex";
+            model: string;
+            /** @description Name of the Secret holding the provider API key */
+            secret?: string;
+            /** @description Override the provider endpoint (OpenAI-compatible gateways, self-hosted models) */
+            base_url?: string;
         };
         TargetLimits: {
             max_concurrency?: number;
@@ -1977,6 +2014,7 @@ export interface components {
             variables?: {
                 [key: string]: string;
             };
+            simulator?: components["schemas"]["SimulatorConfig"];
         };
         TargetDraftTestRequest: {
             kind: components["schemas"]["TargetKind"];
@@ -1987,6 +2025,7 @@ export interface components {
             variables?: {
                 [key: string]: string;
             };
+            simulator?: components["schemas"]["SimulatorConfig"];
         };
         TargetTestResult: {
             ok: boolean;
@@ -2417,8 +2456,11 @@ export interface components {
             category: "deterministic" | "model" | "human";
             group: string;
             description: string;
-            /** @description free | cheap | moderate | expensive */
-            cost: string;
+            /**
+             * @description free: pure computation; model: calls an LLM or embedding model; human: waits for a reviewer
+             * @enum {string}
+             */
+            cost: "free" | "model" | "human";
             /** Format: double */
             default_threshold: number;
             config_schema: components["schemas"]["JSONObject"];
@@ -2536,10 +2578,27 @@ export interface components {
                 judges: boolean;
             };
             baseline?: components["schemas"]["BaselinePolicy"];
+            /** @description Cancel the run early once any limit is exceeded (unset = unlimited) */
             failure_budget?: {
-                /** @description Cancel the run early after this many critical failures */
+                /** @description Max results with a failed critical evaluator */
                 critical_failures?: number;
+                /** @description Max failed results */
+                failures?: number;
+                /** @description Max errored results */
+                errors?: number;
+                /**
+                 * Format: double
+                 * @description Max share of failed results
+                 */
+                fail_rate?: number;
+                /**
+                 * @description Results needed before fail_rate is checked
+                 * @default 50
+                 */
+                min_results: number;
             };
+            /** @description LLM that plays the user in simulated multi-turn examples (`conversation.simulation`) */
+            simulator?: components["schemas"]["SimulatorConfig"];
             timeout_seconds?: number;
             variables?: {
                 [key: string]: string;
@@ -4272,6 +4331,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createSampleProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SampleProjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SampleProject"];
                 };
             };
             default: components["responses"]["Error"];

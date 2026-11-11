@@ -16,6 +16,7 @@ export interface BreadcrumbsProps {
   className?: string
 }
 
+/** Below the lg breakpoint only the current page is shown (the sidebar already locates the project). */
 export function Breadcrumbs({ items, renderLink, className }: BreadcrumbsProps) {
   return (
     <nav aria-label="Breadcrumb" className={cn('min-w-0', className)}>
@@ -32,7 +33,7 @@ export function Breadcrumbs({ items, renderLink, className }: BreadcrumbsProps) 
             'flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 text-text-muted transition-colors hover:text-text focus-ring [&_svg]:size-3.5'
           return (
             <Fragment key={i}>
-              <li className={cn('flex min-w-0 items-center', last ? 'shrink' : 'shrink-[2]')}>
+              <li className={cn('flex min-w-0 items-center', last ? 'shrink' : 'shrink-[2] max-lg:hidden')}>
                 {last || !c.href ? (
                   <span aria-current={last ? 'page' : undefined} className={cn('flex min-w-0 items-center gap-1.5 px-1 [&_svg]:size-3.5', last ? 'font-medium text-text' : 'text-text-muted')}>
                     {content}
@@ -46,7 +47,7 @@ export function Breadcrumbs({ items, renderLink, className }: BreadcrumbsProps) 
                 )}
               </li>
               {!last && (
-                <li aria-hidden className="flex shrink-0 text-border-strong">
+                <li aria-hidden className="flex shrink-0 text-border-strong max-lg:hidden">
                   <ChevronRight className="size-3.5" />
                 </li>
               )}

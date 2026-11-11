@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, toApiError } from './client'
+import { ApiError, querySerializer, toApiError } from './client'
+
+describe('querySerializer', () => {
+  it('comma-separates arrays (explode: false) but repeats label', () => {
+    const q = querySerializer({ status: ['running', 'queued'], label: ['a:1', 'b:2'], limit: 50, empty: [], skip: undefined })
+    expect(q).toBe('status=running%2Cqueued&label=a%3A1&label=b%3A2&limit=50')
+  })
+})
 
 describe('toApiError', () => {
   it('reads {error:{code,message}} bodies', async () => {

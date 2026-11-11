@@ -46,3 +46,9 @@ export function quantile(sorted: number[], q: number): number {
   const next = sorted[base + 1]
   return next !== undefined ? sorted[base]! + rest * (next - sorted[base]!) : sorted[base]!
 }
+
+/** Text alignment for a vertical rule label at x within [min, max], so it never spills past the plot edge. */
+export function edgeAlign(x: number, [min, max]: readonly [number, number]): 'left' | 'center' | 'right' {
+  const f = max > min ? (x - min) / (max - min) : 0.5
+  return f > 0.8 ? 'right' : f < 0.2 ? 'left' : 'center'
+}

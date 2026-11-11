@@ -88,7 +88,7 @@ export function TargetForm({ kind, config, onChange, errors, inputFields = ['que
             </Field>
             {get<string>('method', 'POST') !== 'GET' && (
               <Field label="Body" optional>
-                <TemplateField rows={8} value={get<string>('body', '')} onChange={(v) => set('body', v)} hints={allHints} placeholder={'{ "question": "{{ .input.question }}" }'} />
+                <TemplateField rows={8} value={get<string>('body', '')} onChange={(v) => set('body', v)} hints={allHints} placeholder={'{ "question": {{ json .input.question }} }'} />
               </Field>
             )}
           </FormSection>
