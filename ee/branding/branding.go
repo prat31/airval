@@ -25,7 +25,7 @@ import (
 const settingsKey = "branding"
 
 // Accents is the curated accent set (tokens.css `[data-accent=...]`).
-var Accents = []string{"iris", "indigo", "ocean", "teal", "plum", "rose"}
+var Accents = []string{"iris", "indigo", "ocean", "teal", "plum"}
 
 // MaxLogoBytes bounds the decoded logo.
 const MaxLogoBytes = 128 << 10

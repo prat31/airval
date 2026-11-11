@@ -49,6 +49,7 @@ import { ShortcutsSheet } from './shortcuts-sheet'
 import { themeOptions, ThemeToggle } from './theme-toggle'
 import { useLogout } from '@/features/auth/api'
 import { NewOrgDialog, NewProjectDialog } from '@/features/auth/workspace-dialogs'
+import { applyAccent, DefaultMark, useBranding } from '@/features/settings/ee/branding'
 import { initials, useWorkspace, type Project } from './workspace'
 
 const SIDEBAR_KEY = 'airval.sidebar.collapsed'
@@ -78,13 +79,19 @@ function ProjectDot({ project, className }: { project: Pick<Project, 'color'>; c
 }
 
 function Logo({ collapsed }: { collapsed: boolean }) {
+  const { org } = useWorkspace()
+  const branding = useBranding(org?.id)
+  const accent = branding.data?.accent
+  // White-label accent (enterprise): swap the iris ramp for the org's curated ramp.
+  useEffect(() => {
+    applyAccent(accent)
+    return () => applyAccent(undefined)
+  }, [accent])
+  const logo = branding.data?.logo
   return (
     <span className="flex items-center gap-2">
-      <svg viewBox="0 0 24 24" className="size-6 shrink-0" aria-hidden>
-        <rect width="24" height="24" rx="6" fill="var(--accent)" />
-        <path d="M6.6 17 11.3 7h1.4L17.4 17h-2.3l-1-2.2h-4.2l-1 2.2H6.6Zm4.2-4h2.5L12 10.1 10.8 13Z" fill="var(--on-accent)" />
-      </svg>
-      {!collapsed && <span className="text-md font-semibold tracking-tight text-text">airval</span>}
+      {logo ? <img src={logo} alt="" className="size-6 shrink-0 rounded-md object-contain" /> : <DefaultMark className="size-6" />}
+      {!collapsed && <span className="text-md font-semibold tracking-tight text-text">{branding.data?.product_name || 'airval'}</span>}
     </span>
   )
 }

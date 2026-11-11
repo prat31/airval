@@ -3579,4 +3579,4 @@ components:
       properties:
         product_name: { type: string, maxLength: 40, description: Replaces "airval" in the app chrome }
         logo: { type: string, nullable: true, description: "data: URL (PNG, JPEG, WebP or SVG, ≤ 128 KiB) or null" }
-        accent: { type: string, enum: [iris, indigo, ocean, teal, plum, rose], description: Curated accent ramp (default iris) }
+        accent: { type: string, enum: [iris, indigo, ocean, teal, plum], description: Curated accent ramp (default iris) }

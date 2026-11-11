@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Outlet, useParams } from '@tanstack/react-router'
-import { Bell, KeyRound, Plus, Send, Settings, Trash2, UserPlus } from 'lucide-react'
+import { Bell, KeyRound, Lock, Plus, Send, Settings, Trash2, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { settingsSections, type SettingsSection } from '@/app/nav'
 import { Screen } from '@/app/screen'
@@ -21,14 +21,30 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/cn'
+import { useEdition } from '@/lib/edition'
+import { EESectionScreen, eeSections, isEESection } from './ee'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { errorMessage, fetchAll, http, unwrap, type Obj, type S } from '../shared/api'
 import { useProjectCtx } from '../shared/context'
 import { ConfirmDialog, ErrorPanel, KvEditor, RelTime, TagInput } from '../shared/ui'
 import { SecretPicker } from '../shared/secrets'
 
+function SectionLink({ id, label, active, params, locked }: { id: string; label: string; active: boolean; params: { org: string; project: string }; locked?: boolean }) {
+  return (
+    <Link
+      to="/o/$org/p/$project/settings/$section"
+      params={{ ...params, section: id }}
+      className={cn('flex h-8 shrink-0 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors focus-ring', active ? 'bg-surface text-text shadow-[0_0_0_1px_var(--border)]' : 'text-text-2 hover:bg-surface-hover hover:text-text')}
+    >
+      <span className="flex-1">{label}</span>
+      {locked && <Lock className="size-3 text-text-muted" aria-label="Enterprise" />}
+    </Link>
+  )
+}
+
 export function SettingsLayout() {
   const { params, org } = useProjectCtx()
+  const edition = useEdition()
   const { section } = useParams({ strict: false }) as { section?: string }
   return (
     <Screen>
@@ -36,14 +52,13 @@ export function SettingsLayout() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-[200px_1fr]">
         <nav aria-label="Settings" className="flex gap-1 overflow-x-auto md:flex-col">
           {settingsSections.map((s) => (
-            <Link
-              key={s.id}
-              to="/o/$org/p/$project/settings/$section"
-              params={{ ...params, section: s.id }}
-              className={cn('flex h-8 shrink-0 items-center rounded-md px-2.5 text-sm font-medium transition-colors focus-ring', section === s.id ? 'bg-surface text-text shadow-[0_0_0_1px_var(--border)]' : 'text-text-2 hover:bg-surface-hover hover:text-text')}
-            >
-              {s.label}
-            </Link>
+            <SectionLink key={s.id} id={s.id} label={s.label} active={section === s.id} params={params} />
+          ))}
+          <div className="hidden px-2.5 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-text-muted md:block">
+            Enterprise
+          </div>
+          {eeSections.map((s) => (
+            <SectionLink key={s.id} id={s.id} label={s.label} active={section === s.id} params={params} locked={!edition.isLoading && !edition.has(s.feature)} />
           ))}
         </nav>
         <div className="min-w-0">
@@ -447,7 +462,7 @@ function Appearance() {
 }
 
 export function SettingsSectionScreen() {
-  const { section } = useParams({ strict: false }) as { section: SettingsSection }
+  const { section } = useParams({ strict: false }) as { section: SettingsSection | (string & {}) }
   switch (section) {
     case 'general': return <General />
     case 'members': return <Members />
@@ -455,6 +470,13 @@ export function SettingsSectionScreen() {
     case 'secrets': return <Secrets />
     case 'notifications': return <Notifications />
     case 'appearance': return <Appearance />
-    default: return <Card><EmptyState compact illustration="generic" title="Unknown section" /></Card>
+    default:
+      if (isEESection(section)) return <EESectionScreen section={section} />
+      return <Card><EmptyState compact illustration="generic" title="Unknown section" /></Card>
   }
+}
+
+/** Display label of a settings section id (core or enterprise). */
+export function sectionLabel(id: string): string {
+  return [...settingsSections, ...eeSections].find((s) => s.id === id)?.label ?? id.replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
 }

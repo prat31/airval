@@ -98,7 +98,7 @@
 
   --accent: var(--iris-400);
   --accent-hover: var(--iris-300);
-  --accent-subtle: rgb(143 127 239 / 0.14);
+  --accent-subtle: color-mix(in srgb, var(--iris-400) 14%, transparent);
   --on-accent: #0b0d12;
 
   --pass: #2bc46b;
@@ -144,7 +144,7 @@
     --text-muted: #7f8796;
     --accent: var(--iris-400);
     --accent-hover: var(--iris-300);
-    --accent-subtle: rgb(143 127 239 / 0.14);
+    --accent-subtle: color-mix(in srgb, var(--iris-400) 14%, transparent);
     --on-accent: #0b0d12;
     --pass: #2bc46b;
     --fail: #f0585d;
@@ -196,4 +196,84 @@
   --skipped-subtle: color-mix(in srgb, var(--text-muted) 12%, transparent);
   --diff-add-bg: color-mix(in srgb, var(--pass) 10%, transparent);
   --diff-del-bg: color-mix(in srgb, var(--fail) 9%, transparent);
+}
+
+/*
+ * White-label accents (enterprise branding). Each is a complete 50–900 ramp that replaces the iris ramp,
+ * so --accent, focus rings, selection and the sequential chart ramp follow it. Light uses step 600 (≥ 4.5:1
+ * on white with white text), dark uses step 400 (with --on-accent #0B0D12). Only these curated ramps are
+ * accepted by the API; arbitrary colors are not. Mirrored in plan/001.md §12.3.
+ */
+:root[data-accent='indigo'],
+:root[data-accent='indigo'] [data-theme],
+[data-accent-swatch='indigo'] {
+  --iris-50: #eef2ff;
+  --iris-100: #e0e7ff;
+  --iris-200: #c7d2fe;
+  --iris-300: #a5b4fc;
+  --iris-400: #818cf8;
+  --iris-500: #6366f1;
+  --iris-600: #4f46e5;
+  --iris-700: #4338ca;
+  --iris-800: #3730a3;
+  --iris-900: #312e81;
+}
+
+:root[data-accent='ocean'],
+:root[data-accent='ocean'] [data-theme],
+[data-accent-swatch='ocean'] {
+  --iris-50: #eff6ff;
+  --iris-100: #dbeafe;
+  --iris-200: #bfdbfe;
+  --iris-300: #93c5fd;
+  --iris-400: #60a5fa;
+  --iris-500: #3b82f6;
+  --iris-600: #2563eb;
+  --iris-700: #1d4ed8;
+  --iris-800: #1e40af;
+  --iris-900: #1e3a8a;
+}
+
+:root[data-accent='teal'],
+:root[data-accent='teal'] [data-theme],
+[data-accent-swatch='teal'] {
+  --iris-50: #f0fdfa;
+  --iris-100: #ccfbf1;
+  --iris-200: #99f6e4;
+  --iris-300: #5eead4;
+  --iris-400: #2dd4bf;
+  --iris-500: #14b8a6;
+  --iris-600: #0f766e;
+  --iris-700: #115e59;
+  --iris-800: #134e4a;
+  --iris-900: #0b3b38;
+}
+
+:root[data-accent='plum'],
+:root[data-accent='plum'] [data-theme],
+[data-accent-swatch='plum'] {
+  --iris-50: #faf5ff;
+  --iris-100: #f3e8ff;
+  --iris-200: #e9d5ff;
+  --iris-300: #d8b4fe;
+  --iris-400: #c084fc;
+  --iris-500: #a855f7;
+  --iris-600: #9333ea;
+  --iris-700: #7e22ce;
+  --iris-800: #6b21a8;
+  --iris-900: #581c87;
+}
+
+/* The default ramp, restated so an iris swatch renders correctly while another accent is active. */
+[data-accent-swatch='iris'] {
+  --iris-50: #f3f1fe;
+  --iris-100: #e7e3fd;
+  --iris-200: #d0c8fb;
+  --iris-300: #b0a3f6;
+  --iris-400: #8f7fef;
+  --iris-500: #7462e6;
+  --iris-600: #5e4bd8;
+  --iris-700: #4d3bb8;
+  --iris-800: #3f3194;
+  --iris-900: #342b74;
 }
