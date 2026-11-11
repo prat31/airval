@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { ArrowLeft, CircleCheck, CircleX, Play, Save, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -42,9 +43,10 @@ function Agreement({ id }: { id: string }) {
         ) : !a.data || a.data.n === 0 ? (
           <p className="text-sm text-text-2">No overlap yet. Send results scored by this evaluator to a review queue; human grades calibrate it.</p>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Cohen's κ" value={a.data.cohens_kappa != null ? a.data.cohens_kappa.toFixed(2) : '—'} unit={a.data.cohens_kappa != null ? kappaLabel(a.data.cohens_kappa) : undefined} />
             <StatTile label="Agreement" value={a.data.percent_agreement != null ? formatPercent(a.data.percent_agreement, 0) : '—'} />
+            <StatTile label="Pearson r" value={a.data.pearson != null ? a.data.pearson.toFixed(2) : '—'} unit={a.data.n_numeric ? `n=${a.data.n_numeric}` : undefined} />
             <StatTile label="Mean abs. error" value={a.data.mean_abs_error != null ? a.data.mean_abs_error.toFixed(2) : '—'} unit={`n=${a.data.n}`} />
           </div>
         )}
@@ -261,12 +263,10 @@ export function EvaluatorEditor({ id, newKind, onBack, onSaved }: { id?: string;
           </Card>
 
           <Card>
-            <CardHeader title="Settings" description={catalog.data?.fallback ? 'The evaluator catalog is unavailable, so settings are edited as raw JSON.' : undefined} />
+            <CardHeader title="Settings" />
             <CardBody>
               {schema?.properties && Object.keys(schema.properties).length > 0 ? (
                 <SchemaForm schema={schema} value={config} onChange={setConfig} errors={showErrors || Object.keys(errors).length ? errors : {}} />
-              ) : catalog.data?.fallback ? (
-                <JsonEditor value={config} onChange={(v) => setConfig((v as Obj) ?? {})} rows={10} placeholder="{ }" />
               ) : (
                 <p className="text-sm text-text-muted">This evaluator has no settings. It works out of the box.</p>
               )}

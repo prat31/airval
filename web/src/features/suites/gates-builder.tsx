@@ -12,11 +12,8 @@ import type { S } from '../shared/api'
 import {
   comparators,
   conditionProblem,
-  conditionText,
-  conditionsFromExpr,
+  conditionsText,
   defaultMetricFor,
-  exprFromConditions,
-  exprText,
   fnOptions,
   metricOptions,
   newCondition,
@@ -39,19 +36,20 @@ export interface GateDraft {
   joiner: Joiner
   conds: Condition[]
   /** Expression the builder can't represent (nested logic); edited as text only. */
-  advanced?: S['GateExpr']
+  advanced?: string
 }
 
 let seq = 0
 export const newGateKey = () => `g${++seq}`
 
-export function gateFromServer(g: S['Gate']): GateDraft {
-  const flat = conditionsFromExpr(g.expr)
-  return { key: g.id, id: g.id, name: g.name, enabled: g.enabled, joiner: flat?.joiner ?? 'and', conds: flat?.conds ?? [], advanced: flat ? undefined : g.expr }
+export function gateFromServer(g: S['Gate'], evaluators: Ev[]): GateDraft {
+  const r = parseGateText(g.text, evaluators)
+  return { key: g.id, id: g.id, name: g.name, enabled: g.enabled, joiner: r.ok ? r.joiner : 'and', conds: r.ok ? r.conds : [], advanced: r.ok ? undefined : g.text }
 }
 
-export function gateExpr(g: GateDraft): S['GateExpr'] | null {
-  return g.advanced ?? exprFromConditions(g.conds, g.joiner)
+/** The text the server parses and stores as an AST. */
+export function gateText(g: GateDraft, evalName: (id?: string) => string): string {
+  return g.advanced ?? conditionsText(g.conds, g.joiner, evalName)
 }
 
 export function gateProblem(g: GateDraft): string | null {
@@ -69,7 +67,7 @@ type Ev = { id: string; name: string }
 function ConditionRow({ c, evaluators, onChange, onRemove, removable }: { c: Condition; evaluators: Ev[]; onChange: (c: Condition) => void; onRemove: () => void; removable: boolean }) {
   const problem = conditionProblem(c)
   const needsEvaluator = c.metric === 'evaluator' || c.fn === 'regression_vs_baseline'
-  const showSelector = c.fn === 'count' || c.fn === 'pass_rate'
+  const showSelector = c.fn === 'count'
   const set = (patch: Partial<Condition>) => onChange({ ...c, ...patch })
   return (
     <div className="flex flex-col gap-1">
@@ -80,7 +78,7 @@ function ConditionRow({ c, evaluators, onChange, onRemove, removable }: { c: Con
           value={c.fn}
           onValueChange={(fn) => {
             const metric = defaultMetricFor(fn as Fn)
-            set({ fn: fn as Fn, metric, selector: fn === 'count' ? 'failed' : undefined, evaluator_id: metric === 'evaluator' || fn === 'regression_vs_baseline' ? (c.evaluator_id ?? evaluators[0]?.id) : undefined })
+            set({ fn: fn as Fn, metric, selector: fn === 'count' ? 'fail' : undefined, evaluator_id: metric === 'evaluator' || fn === 'regression_vs_baseline' ? (c.evaluator_id ?? evaluators[0]?.id) : undefined })
           }}
           options={fnOptions.map((f) => ({ value: f.value, label: f.label }))}
         />
@@ -104,12 +102,11 @@ function ConditionRow({ c, evaluators, onChange, onRemove, removable }: { c: Con
             options={evaluators.map((e) => ({ value: e.id, label: e.name }))}
           />
         )}
-        {showSelector && (c.metric === 'results' || c.fn === 'count') && (
-          <Select size="sm" aria-label="Which results" value={c.selector ?? 'all'} onValueChange={(s) => set({ selector: s as Selector })} options={selectorOptions.map((s) => ({ value: s.value, label: s.label }))} />
+        {showSelector && (
+          <Select size="sm" aria-label="Which results" value={c.selector ?? 'fail'} onValueChange={(s) => set({ selector: s as Selector })} options={selectorOptions.map((s) => ({ value: s.value, label: s.label }))} />
         )}
         <Select size="sm" aria-label="Comparator" value={c.comparator} onValueChange={(cmp) => set({ comparator: cmp as Cmp })} options={comparators.map((x) => ({ value: x, label: x }))} />
         <Input size="sm" type="number" step="any" aria-label="Threshold" value={Number.isFinite(c.value) ? String(c.value) : ''} onChange={(e) => set({ value: e.target.value === '' ? NaN : Number(e.target.value) })} className="tabular" />
-        <Input size="sm" aria-label="Tag filter" placeholder="Tag (optional)" value={c.tag ?? ''} onChange={(e) => set({ tag: e.target.value || undefined })} />
         <IconButton label="Remove condition" size="sm" disabled={!removable} onClick={onRemove}>
           <Trash2 />
         </IconButton>
@@ -122,7 +119,7 @@ function ConditionRow({ c, evaluators, onChange, onRemove, removable }: { c: Con
 function GateCard({ gate, evaluators, onChange, onRemove }: { gate: GateDraft; evaluators: Ev[]; onChange: (g: GateDraft) => void; onRemove: () => void }) {
   const [mode, setMode] = useState<'builder' | 'text'>(gate.advanced ? 'text' : 'builder')
   const name = (id?: string) => evaluators.find((e) => e.id === id)?.name ?? 'evaluator'
-  const text = gate.advanced ? exprText(gate.advanced, name) : gate.conds.length === 0 ? '' : gate.conds.map((c) => conditionText(c, name)).join(` ${gate.joiner} `)
+  const text = gateText(gate, name)
   const [draftText, setDraftText] = useState(text)
   const parsed = mode === 'text' && !gate.advanced ? parseGateText(draftText, evaluators) : null
   const problem = gateProblem(gate)
@@ -179,7 +176,10 @@ function GateCard({ gate, evaluators, onChange, onRemove }: { gate: GateDraft; e
           </div>
         </div>
       ) : gate.advanced ? (
-        <p className="text-sm text-text-2">This gate uses nested logic, so it is shown as text. Edit it via the API or recreate it with the builder.</p>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-text-muted">This gate uses nested logic, so it is edited as text. The server validates it on save.</p>
+          <Input aria-label="Gate expression" className="font-mono text-xs" spellCheck={false} value={gate.advanced} onChange={(e) => onChange({ ...gate, advanced: e.target.value })} />
+        </div>
       ) : (
         <div className="flex flex-col gap-1.5">
           <Input

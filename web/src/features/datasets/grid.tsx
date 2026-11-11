@@ -4,7 +4,7 @@
  */
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/cn'
@@ -102,7 +102,7 @@ export interface GridProps {
   /** Row to focus + edit after creation. */
   focusRowId?: string | null
   onFocusHandled?: () => void
-  empty?: React.ReactNode
+  empty?: ReactNode
   height?: number | string
 }
 
@@ -359,7 +359,5 @@ export function ExampleGrid({ rows, columns, readOnly, loading, hasMore, loading
 
 /** Stable memo helper so grids don't rebuild columns every render. */
 export function useColumns(examples: Example[], schemaFields: string[] | undefined, extra: string[]) {
-  const sig = `${examples.length}:${examples[0]?.id ?? ''}`
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => buildColumns(examples, schemaFields, extra), [sig, (schemaFields ?? []).join(','), extra.join(',')])
+  return buildColumns(examples, schemaFields, extra)
 }

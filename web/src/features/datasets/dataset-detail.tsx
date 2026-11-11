@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { Database, Download, MoreHorizontal, Pencil, Plus, Rocket, Tag, Trash2, Upload, X } from 'lucide-react'

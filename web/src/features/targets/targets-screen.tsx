@@ -35,7 +35,8 @@ export function TargetsScreen() {
   const del = useDeleteTarget(ctx.projectId)
   const [search, patch] = useSearchState()
   const q = str(search.q)
-  const kinds = str(search.kind) ? str(search.kind).split(',') : []
+  const kindsKey = str(search.kind)
+  const kinds = kindsKey ? kindsKey.split(",") : []
   const [toDelete, setToDelete] = useState<S['Target'] | null>(null)
 
   const rows = useMemo(
@@ -45,12 +46,10 @@ export function TargetsScreen() {
         const hay = `${t.name} ${t.description} ${targetEndpoint(t.kind, t.current_version?.config as never)}`.toLowerCase()
         return !q || hay.includes(q.toLowerCase())
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [targets.data, q, kinds.join(',')],
+    [targets.data, q, kindsKey],
   )
 
-  const columns = useMemo<ColumnDef<S['Target'], unknown>[]>(
-    () => [
+  const columns: ColumnDef<S['Target'], unknown>[] = [
       {
         accessorKey: 'name',
         header: 'Target',
@@ -92,9 +91,7 @@ export function TargetsScreen() {
           </DropdownMenu>
         ),
       },
-    ],
-    [],
-  )
+  ]
 
   const newButton = (
     <Button variant="primary" icon={<Plus />} asChild>

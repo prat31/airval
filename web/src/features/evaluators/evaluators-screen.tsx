@@ -83,8 +83,7 @@ export function EvaluatorsScreen() {
   const hasOwn = (evaluators.data?.length ?? 0) > 0
   const tab = str(search.tab, hasOwn || evaluators.isLoading ? 'library' : 'catalog')
 
-  const columns = useMemo<ColumnDef<S['Evaluator'], unknown>[]>(
-    () => [
+  const columns: ColumnDef<S['Evaluator'], unknown>[] = [
       {
         accessorKey: 'name',
         header: 'Evaluator',
@@ -121,9 +120,7 @@ export function EvaluatorsScreen() {
           </DropdownMenu>
         ),
       },
-    ],
-    [kindInfo],
-  )
+  ]
 
   if (editId || newKind) {
     return (

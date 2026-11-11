@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { Activity, Crosshair, History, RotateCcw, Save, Settings2, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'

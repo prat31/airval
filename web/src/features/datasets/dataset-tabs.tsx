@@ -120,7 +120,7 @@ export function VersionsTab({ dataset, onView }: { dataset: S['Dataset']; onView
                   {diff.changed.slice(0, 20).map(({ before, after }) => (
                     <div key={after.id} className="rounded-md border border-border">
                       <div className="border-b border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-text-muted">Changed example</div>
-                      <DiffViewer bare oldValue={stableStringify(exampleView(before))} newValue={stableStringify(exampleView(after))} mode="lines" maxHeight={260} />
+                      <DiffViewer oldValue={stableStringify(exampleView(before))} newValue={stableStringify(exampleView(after))} mode="lines" maxHeight={260} />
                     </div>
                   ))}
                   {diff.added.slice(0, 20).map((e) => (

@@ -44,8 +44,8 @@ export function useExamples(id: string | undefined, opts: { version?: number; q?
     queryKey: datasetKeys.examples(id, opts.version, opts.q, opts.tag),
     enabled: !!id,
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.next_cursor ?? undefined,
-    queryFn: ({ pageParam }) =>
+    getNextPageParam: (last: S['ExampleList']) => last.next_cursor ?? undefined,
+    queryFn: ({ pageParam }): Promise<S['ExampleList']> =>
       unwrap(http.GET('/v1/datasets/{dataset}/examples', { params: { path: { dataset: id! }, query: { cursor: pageParam, limit: PAGE, version: opts.version, q: opts.q || undefined, tag: opts.tag || undefined } } })),
   })
 }

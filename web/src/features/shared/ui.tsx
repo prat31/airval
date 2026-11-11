@@ -188,6 +188,7 @@ export function TagInput({
  * KvEditor: editable string map (headers, query, variables).
  * ----------------------------------------------------------------------------------------------- */
 type Row = { id: number; k: string; v: string }
+let rowSeq = 1
 
 export function KvEditor({
   value,
@@ -206,8 +207,7 @@ export function KvEditor({
   monoValue?: boolean
   className?: string
 }) {
-  const nextId = useRef(1)
-  const fromValue = (v: Record<string, string> | undefined): Row[] => Object.entries(v ?? {}).map(([k, val]) => ({ id: nextId.current++, k, v: String(val) }))
+  const fromValue = (v: Record<string, string> | undefined): Row[] => Object.entries(v ?? {}).map(([k, val]) => ({ id: rowSeq++, k, v: String(val) }))
   const [rows, setRows] = useState<Row[]>(() => fromValue(value))
   const derived = (rs: Row[]) => Object.fromEntries(rs.filter((r) => r.k.trim()).map((r) => [r.k.trim(), r.v]))
   // Re-seed only when the outside value genuinely differs from what the rows already express (e.g. version restore).
@@ -235,7 +235,7 @@ export function KvEditor({
         </div>
       ))}
       <div>
-        <Button size="sm" variant="ghost" icon={<Plus />} onClick={() => setRows([...rows, { id: nextId.current++, k: '', v: '' }])}>
+        <Button size="sm" variant="ghost" icon={<Plus />} onClick={() => setRows([...rows, { id: rowSeq++, k: '', v: '' }])}>
           {addLabel}
         </Button>
       </div>
@@ -354,11 +354,14 @@ export function JsonEditor({
 }) {
   const [text, setText] = useState(() => pretty(value))
   const [error, setError] = useState<string | null>(null)
-  const last = useRef(pretty(value))
   const incoming = pretty(value)
-  if (incoming !== last.current && !error) {
-    last.current = incoming
-    if (incoming !== text) setText(incoming)
+  const [seen, setSeen] = useState(incoming)
+  if (incoming !== seen) {
+    setSeen(incoming)
+    if (!error) {
+      const cur = tryParse(text)
+      if (!cur.ok || pretty(cur.value) !== incoming) setText(incoming)
+    }
   }
   return (
     <div className="flex flex-col gap-1">
@@ -376,7 +379,7 @@ export function JsonEditor({
           const r = tryParse(t)
           if (r.ok) {
             setError(null)
-            last.current = pretty(r.value)
+            setSeen(pretty(r.value))
             onChange(r.value)
           } else setError(r.error)
         }}

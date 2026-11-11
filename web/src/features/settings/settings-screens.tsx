@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Outlet, useParams } from '@tanstack/react-router'
 import { Bell, KeyRound, Plus, Send, Settings, Trash2, UserPlus } from 'lucide-react'

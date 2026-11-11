@@ -15,8 +15,7 @@ import { cn } from '@/lib/cn'
 import { formatDuration, formatUsd } from '@/lib/format'
 import { errorMessage, type Obj, type S } from '../shared/api'
 import { useDatasets, useExamples } from '../datasets/api'
-import { evalPath } from '../shared/jsonpath'
-import { getIn, isObj, redact } from '../shared/obj'
+import { isObj, redact } from '../shared/obj'
 import { KvEditor, pretty, tryParse } from '../shared/ui'
 import { useTestDraft } from './api'
 import { isHttpLike, type TargetKind } from './kinds'
@@ -29,9 +28,8 @@ function preview(v: unknown, max = 120): string {
 }
 
 /** Per-path match table: each configured JSONPath evaluated against the raw response. */
-function MatchTable({ config, raw }: { config: Obj; raw: unknown }) {
-  const resp = getIn<Obj>(config, ['http', 'response'], {})
-  const rows = Object.entries(resp).filter(([, v]) => typeof v === 'string' && v)
+function MatchTable({ mapping }: { mapping: NonNullable<S['TargetTestResult']['mapping']> }) {
+  const rows = mapping.map((m) => [m.field, m] as const)
   if (!rows.length) return <p className="px-4 py-6 text-center text-sm text-text-muted">No response mapping configured for this target kind.</p>
   return (
     <table className="w-full text-sm">
@@ -44,9 +42,9 @@ function MatchTable({ config, raw }: { config: Obj; raw: unknown }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map(([field, path]) => {
-          const r = evalPath(raw, String(path))
-          const status = !r.valid ? 'invalid' : r.matches.length === 0 ? 'none' : 'match'
+        {rows.map(([field, m]) => {
+          const path = m.path
+          const status = m.matched ? 'match' : 'none'
           return (
             <tr key={field} className="border-b border-border last:border-b-0 align-top">
               <td className="px-4 py-2 font-medium text-text">{field.replace(/_/g, ' ')}</td>
@@ -54,20 +52,16 @@ function MatchTable({ config, raw }: { config: Obj; raw: unknown }) {
               <td className="px-2 py-2">
                 {status === 'match' ? (
                   <Badge variant="pass">
-                    <CircleCheck /> {r.matches.length} match{r.matches.length === 1 ? '' : 'es'}
-                  </Badge>
-                ) : status === 'none' ? (
-                  <Badge variant="warn">
-                    <TriangleAlert /> No match
+                    <CircleCheck /> Match
                   </Badge>
                 ) : (
-                  <Badge variant="fail">
-                    <CircleX /> Invalid path
+                  <Badge variant="warn">
+                    <TriangleAlert /> No match
                   </Badge>
                 )}
               </td>
               <td className="max-w-80 px-4 py-2 font-mono text-xs text-text-2">
-                <span className="line-clamp-2 break-all">{status === 'match' ? preview(r.matches.length === 1 ? r.matches[0] : r.matches) : '—'}</span>
+                <span className="line-clamp-2 break-all">{status === 'match' ? preview(m.value) : '—'}</span>
               </td>
             </tr>
           )
@@ -280,7 +274,7 @@ export function Playground({ kind, config, projectId, disabledReason }: { kind: 
             </TabsContent>
             {isHttpLike(kind) && (
               <TabsContent value="match">
-                <MatchTable config={config} raw={rawParsed} />
+                <MatchTable mapping={result.mapping ?? []} />
               </TabsContent>
             )}
           </Tabs>

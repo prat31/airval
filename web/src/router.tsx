@@ -16,19 +16,17 @@ import { CompareScreen } from './routes/compare'
 import { ErrorScreen, NotFoundScreen } from './routes/not-found'
 import { OnboardingScreen } from './routes/onboarding'
 import { OverviewScreen } from './routes/overview'
-import {
-  DatasetDetailScreen,
-  DatasetsScreen,
-  EvaluatorsScreen,
-  ReviewScreen,
-  SuiteDetailScreen,
-  SuitesScreen,
-  TargetDetailScreen,
-  TargetsScreen,
-} from './routes/placeholders'
 import { RunDetailScreen, RunsScreen } from './routes/runs'
-import { SettingsLayout, SettingsSectionScreen } from './routes/settings'
-import { SuiteNewScreen } from './routes/suite-new'
+import { DatasetDetailScreen } from './features/datasets/dataset-detail'
+import { DatasetsScreen } from './features/datasets/datasets-screen'
+import { EvaluatorsScreen } from './features/evaluators/evaluators-screen'
+import { ReviewScreen } from './features/review/review-screen'
+import { SettingsLayout, SettingsSectionScreen } from './features/settings/settings-screens'
+import { SuiteDetailScreen } from './features/suites/suite-detail'
+import { SuiteNewScreen } from './features/suites/suite-new'
+import { SuitesScreen } from './features/suites/suites-screen'
+import { TargetDetailScreen } from './features/targets/target-detail'
+import { TargetsScreen } from './features/targets/targets-screen'
 
 const rootRoute = createRootRoute({
   component: Outlet,

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { CircleCheck, FileUp, Loader2, Sparkles, TriangleAlert, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +16,7 @@ import { TagInput, useDebounced } from '../shared/ui'
 import { importFile, importJson, useRefreshDraft, type ImportRequest } from './api'
 
 type Format = S['DatasetImportFormat']
-type SourceMode = 'upload' | 'paste' | 'huggingface' | 'url'
+type SourceMode = 'upload' | 'paste' | 'huggingface'
 type Mapping = NonNullable<ImportRequest['mapping']>
 
 const formats: { value: Format; label: string }[] = [
@@ -53,7 +54,7 @@ export function suggestMapping(columns: string[]): Mapping {
   if (tags) used.add(tags)
   const inputs = input ? [input] : columns.length ? [columns[0]!] : []
   if (!input && columns[0]) used.add(columns[0])
-  return { input: inputs, expected, context, tags, metadata: columns.filter((c) => !used.has(c)), rest_to_metadata: false }
+  return { input_columns: Object.fromEntries(inputs.map((c) => [c, c])), expected_column: expected, context_column: context, tags_column: tags, metadata_columns: columns.filter((c) => !used.has(c)) }
 }
 
 function Dropzone({ file, onFile }: { file: File | null; onFile: (f: File) => void }) {
@@ -139,7 +140,6 @@ export function ImportWizard({ open, onOpenChange, datasetId, onDone }: { open: 
   const [file, setFile] = useState<File | null>(null)
   const [format, setFormat] = useState<Format>('csv')
   const [pasted, setPasted] = useState('')
-  const [url, setUrl] = useState('')
   const [hfRepo, setHfRepo] = useState('')
   const [hfConfig, setHfConfig] = useState('')
   const [hfSplit, setHfSplit] = useState('train')
@@ -179,20 +179,18 @@ export function ImportWizard({ open, onOpenChange, datasetId, onDone }: { open: 
     const lim = limit ? Number(limit) : undefined
     switch (mode) {
       case 'upload':
-        return { kind: 'upload', format, limit: lim }
+        return { kind: 'upload', format, limit: lim, hf_split: 'train' }
       case 'paste':
-        return { kind: 'inline', format, data: pasted, limit: lim }
-      case 'url':
-        return { kind: 'url', format, url, limit: lim }
+        return { kind: 'inline', format, data: pasted, limit: lim, hf_split: 'train' }
       case 'huggingface':
         return { kind: 'huggingface', hf_repo: hfRepo.trim(), hf_config: hfConfig || undefined, hf_split: hfSplit || 'train', limit: lim }
     }
-  }, [mode, format, pasted, url, hfRepo, hfConfig, hfSplit, limit])
+  }, [mode, format, pasted, hfRepo, hfConfig, hfSplit, limit])
 
-  const sourceReady = mode === 'upload' ? !!file : mode === 'paste' ? pasted.trim().length > 0 : mode === 'url' ? /^https?:\/\//.test(url) : /^[\w.-]+\/[\w.-]+$/.test(hfRepo.trim())
+  const sourceReady = mode === 'upload' ? !!file : mode === 'paste' ? pasted.trim().length > 0 : /^[\w.-]+\/[\w.-]+$/.test(hfRepo.trim())
 
   const send = useCallback(
-    (req: ImportRequest) => (mode === 'upload' && file ? importFile(datasetId, file, { ...req, source: { kind: 'upload', format, limit: req.source?.limit } }) : importJson(datasetId, req)),
+    (req: ImportRequest) => (mode === 'upload' && file ? importFile(datasetId, file, { ...req, source: { kind: 'upload', format, limit: req.source?.limit, hf_split: 'train' } }) : importJson(datasetId, req)),
     [mode, file, datasetId, format],
   )
 
@@ -202,9 +200,9 @@ export function ImportWizard({ open, onOpenChange, datasetId, onDone }: { open: 
     try {
       const r = await send({ source, mapping: m, preview: true, mode: writeMode })
       if (first) {
-        const cols = r.columns ?? []
+        const cols = r.source_preview?.columns.map((c) => c.name) ?? r.columns ?? []
         setColumns(cols)
-        const sug = suggestMapping(cols)
+        const sug = r.suggested_mapping ?? suggestMapping(cols)
         setMapping(sug)
         setSuggested(true)
         setStep(1)
@@ -258,7 +256,8 @@ export function ImportWizard({ open, onOpenChange, datasetId, onDone }: { open: 
     setSuggested(false)
     setMapping((m) => ({ ...m, ...patch }))
   }
-  const noInput = (mapping.input ?? []).length === 0
+  const inputCols = Object.keys(mapping.input_columns ?? {})
+  const noInput = inputCols.length === 0 && !mapping.whole_row_as_input
 
   const steps = [
     { id: 'source', label: 'Source', description: 'File or reference' },
@@ -318,7 +317,6 @@ export function ImportWizard({ open, onOpenChange, datasetId, onDone }: { open: 
                 { value: 'upload', label: 'Upload' },
                 { value: 'paste', label: 'Paste' },
                 { value: 'huggingface', label: 'Hugging Face' },
-                { value: 'url', label: 'URL' },
               ]}
             />
             {mode === 'upload' && (
@@ -333,11 +331,6 @@ export function ImportWizard({ open, onOpenChange, datasetId, onDone }: { open: 
             {mode === 'paste' && (
               <Field label="Data">
                 <Textarea mono rows={9} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder={'question,answer\nWhat is 2+2?,4'} spellCheck={false} />
-              </Field>
-            )}
-            {mode === 'url' && (
-              <Field label="File URL" hint="Publicly reachable. airval fetches it server-side.">
-                <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/data.jsonl" />
               </Field>
             )}
             {mode === 'huggingface' && (
@@ -378,17 +371,17 @@ export function ImportWizard({ open, onOpenChange, datasetId, onDone }: { open: 
               )}
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <ColumnPicker label="Input" hint="One or more columns" columns={columns} multiple value={mapping.input ?? []} onChange={(v) => setMap({ input: v })} />
-              <ColumnPicker label="Expected" columns={columns} value={mapping.expected ? [mapping.expected] : []} onChange={(v) => setMap({ expected: v[0] })} />
-              <ColumnPicker label="Context" columns={columns} value={mapping.context ? [mapping.context] : []} onChange={(v) => setMap({ context: v[0] })} />
-              <ColumnPicker label="Tags" hint="Comma-separated" columns={columns} value={mapping.tags ? [mapping.tags] : []} onChange={(v) => setMap({ tags: v[0] })} />
-              <ColumnPicker label="Metadata" columns={columns} multiple value={mapping.metadata ?? []} onChange={(v) => setMap({ metadata: v })} />
+              <ColumnPicker label="Input" hint="One or more columns" columns={columns} multiple value={inputCols} onChange={(v) => setMap({ input_columns: Object.fromEntries(v.map((c) => [c, mapping.input_columns?.[c] ?? c])) })} />
+              <ColumnPicker label="Expected" columns={columns} value={mapping.expected_column ? [mapping.expected_column] : []} onChange={(v) => setMap({ expected_column: v[0] })} />
+              <ColumnPicker label="Context" columns={columns} value={mapping.context_column ? [mapping.context_column] : []} onChange={(v) => setMap({ context_column: v[0] })} />
+              <ColumnPicker label="Tags" hint="Comma-separated" columns={columns} value={mapping.tags_column ? [mapping.tags_column] : []} onChange={(v) => setMap({ tags_column: v[0] })} />
+              <ColumnPicker label="Metadata" columns={columns} multiple value={mapping.metadata_columns ?? []} onChange={(v) => setMap({ metadata_columns: v })} />
               <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                 <div>
-                  <div className="text-sm font-medium text-text">Unmapped columns to metadata</div>
-                  <p className="mt-0.5 text-xs text-text-muted">Keep everything else.</p>
+                  <div className="text-sm font-medium text-text">Whole row as input</div>
+                  <p className="mt-0.5 text-xs text-text-muted">Put every unmapped column into input.</p>
                 </div>
-                <Switch aria-label="Unmapped columns to metadata" checked={!!mapping.rest_to_metadata} onCheckedChange={(v) => setMap({ rest_to_metadata: v })} />
+                <Switch aria-label="Unmapped columns to metadata" checked={!!mapping.whole_row_as_input} onCheckedChange={(v) => setMap({ whole_row_as_input: v })} />
               </div>
             </div>
             {noInput && <ErrorNote message="Choose at least one input column." />}

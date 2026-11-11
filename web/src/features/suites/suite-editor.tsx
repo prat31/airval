@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, ArrowRight, Check, Crosshair, Database, Gauge, Plus, Save, Trash2 } from 'lucide-react'
@@ -29,7 +30,7 @@ import { FieldRow, KvEditor, RelTime } from '../shared/ui'
 import { kindMeta, targetEndpoint } from '../targets/kinds'
 import { useTargets } from '../targets/api'
 import { suiteKeys, useGates } from './api'
-import { gateExpr, gateFromServer, gateProblem, GatesBuilder, type GateDraft } from './gates-builder'
+import { gateFromServer, gateProblem, gateText, GatesBuilder, type GateDraft } from './gates-builder'
 
 export const steps = [
   { id: 'target', label: 'Target', description: 'What to evaluate' },
@@ -83,7 +84,7 @@ const emptyDraft = (): Draft => ({
   variables: {},
 })
 
-function draftFromSuite(s: S['Suite'], gates: S['Gate'][]): Draft {
+function draftFromSuite(s: S['Suite'], gates: S['Gate'][], evs: { id: string; name: string }[] = []): Draft {
   const c = s.config as Obj
   const g = <T,>(path: string[], f?: T) => getIn<T>(c, path, f)
   return {
@@ -92,7 +93,7 @@ function draftFromSuite(s: S['Suite'], gates: S['Gate'][]): Draft {
     targetIds: g<string[]>(['target_ids'], []),
     datasets: g<{ dataset_id: string; version: number | null }[]>(['datasets'], []).map((d) => ({ dataset_id: d.dataset_id, version: d.version ?? null })),
     evaluators: g<S['SuiteEvaluator'][]>(['evaluators'], []),
-    gates: gates.map(gateFromServer),
+    gates: gates.map((g) => gateFromServer(g, evs)),
     trials: g<number>(['trials'], 1),
     samplingMode: g<Draft['samplingMode']>(['sampling', 'mode'], 'none'),
     samplingN: String(g<number | undefined>(['sampling', 'n']) ?? ''),
@@ -125,7 +126,7 @@ function configFromDraft(d: Draft): S['SuiteConfig'] {
   if (n(d.criticalBudget)) cfg.failure_budget = { critical_failures: n(d.criticalBudget) }
   if (n(d.timeout)) cfg.timeout_seconds = n(d.timeout)
   if (Object.keys(d.variables).length) cfg.variables = d.variables
-  return cfg
+  return cfg as unknown as S['SuiteConfig']
 }
 
 /* --------------------------------------------------------------------------------------------- steps */
@@ -536,11 +537,11 @@ export function SuiteEditor({ suite, initialStep = 0, onClose }: { suite?: S['Su
 
   // Gates load separately for an existing suite.
   useEffect(() => {
-    if (suite && gatesQ.data && !seeded) {
-      setD(draftFromSuite(suite, gatesQ.data.items))
+    if (suite && gatesQ.data && evaluators.data && !seeded) {
+      setD(draftFromSuite(suite, gatesQ.data.items, evaluators.data ?? []))
       setSeeded(true)
     }
-  }, [suite, gatesQ.data, seeded])
+  }, [suite, gatesQ.data, evaluators.data, seeded])
 
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }))
   const attached = d.evaluators.map((se) => ({ id: se.evaluator_id, name: evaluators.data?.find((e) => e.id === se.evaluator_id)?.name ?? 'evaluator' }))
@@ -578,8 +579,8 @@ export function SuiteEditor({ suite, initialStep = 0, onClose }: { suite?: S['Su
       await Promise.all([
         ...existing.filter((g) => !keep.has(g.id)).map((g) => unwrap(http.DELETE('/v1/suites/{suite}/gates/{gate}', { params: { path: { suite: saved.id, gate: g.id } } }))),
         ...d.gates.map((g) => {
-          const expr = gateExpr(g)!
-          const body = { name: g.name.trim() || undefined, expr, enabled: g.enabled }
+          const text = gateText(g, (id) => attached.find((a) => a.id === id)?.name ?? 'evaluator')
+          const body = { name: g.name.trim() || undefined, text, enabled: g.enabled }
           return g.id
             ? unwrap(http.PATCH('/v1/suites/{suite}/gates/{gate}', { params: { path: { suite: saved.id, gate: g.id } }, body }))
             : unwrap(http.POST('/v1/suites/{suite}/gates', { params: { path: { suite: saved.id } }, body }))

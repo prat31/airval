@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- local drafts are seeded from server data */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ClipboardCheck, Plus, SkipForward } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -170,7 +171,7 @@ function Grader({ queue, onBack }: { queue: S['ReviewQueue']; onBack: () => void
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
           <Card>
-            <CardHeader title={`Item ${Math.min(idx, list.length - 1) + 1} of ${list.length}`} description={`Result · trial ${result.trial + 1}`} actions={<Badge variant={result.status === 'passed' ? 'pass' : result.status === 'passed' ? 'neutral' : 'fail'}>{result.status}</Badge>} />
+            <CardHeader title={`Item ${Math.min(idx, list.length - 1) + 1} of ${list.length}`} description={`Result · trial ${result.trial + 1}`} actions={<Badge variant={result.status === 'skipped' ? 'neutral' : 'fail'}>{result.status}</Badge>} />
             <CardBody className="flex flex-col gap-4">
               <Block title="Input">{asText(result.input)}</Block>
               {result.expected !== undefined && result.expected !== null && <Block title="Expected">{asText(result.expected)}</Block>}

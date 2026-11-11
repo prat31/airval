@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError, fetchAll, http, rawJson, unwrap, type Obj, type S } from '../shared/api'
+import { fetchAll, http, unwrap, type Obj, type S } from '../shared/api'
 import type { JsonSchema } from '../shared/schema-form'
 
 /** One evaluator kind as served by the catalog (mirrors internal/evaluators KindInfo). */
@@ -18,46 +18,14 @@ export interface KindInfo {
   prompt?: string
 }
 
-const KINDS: S['EvaluatorKind'][] = [
-  'equals', 'contains', 'regex', 'starts_with', 'ends_with', 'is_json', 'json_schema', 'jsonpath_equals', 'numeric_close', 'levenshtein', 'rouge_l', 'bleu', 'length', 'latency_ms',
-  'cost_usd', 'tokens', 'tool_called', 'tool_sequence', 'no_pii', 'refusal', 'embedding_similarity', 'llm_rubric', 'correctness', 'faithfulness', 'groundedness', 'answer_relevance',
-  'context_relevance', 'context_recall', 'hallucination', 'toxicity', 'bias', 'conciseness', 'helpfulness', 'conversation_goal_completion', 'conversation_coherence',
-  'tool_use_correctness', 'pairwise', 'human',
-]
-const MODEL = new Set(['embedding_similarity', 'llm_rubric', 'correctness', 'faithfulness', 'groundedness', 'answer_relevance', 'context_relevance', 'context_recall', 'hallucination', 'toxicity', 'bias', 'conciseness', 'helpfulness', 'conversation_goal_completion', 'conversation_coherence', 'tool_use_correctness', 'pairwise'])
-
 export const humanizeKind = (k: string) => k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
 
-/** Used only when the catalog endpoint is unavailable: enough to pick a kind and edit raw JSON config. */
-function fallbackCatalog(): KindInfo[] {
-  return KINDS.map((kind) => ({
-    kind,
-    name: humanizeKind(kind),
-    category: kind === 'human' ? 'human' : MODEL.has(kind) ? 'model' : 'deterministic',
-    group: kind === 'human' ? 'Human review' : MODEL.has(kind) ? 'Model-based' : 'Deterministic',
-    description: '',
-    default_threshold: 0.5,
-    config_schema: undefined,
-  }))
-}
-
-/**
- * Evaluator catalog with JSON-schema configs.
- * TODO: switch to the generated client once `GET /v1/evaluators/catalog` is in api/openapi.yaml.
- */
+/** Evaluator catalog with JSON-schema configs (renders the evaluator forms). */
 export function useCatalog() {
   return useQuery({
     queryKey: ['evaluator-catalog'],
     staleTime: 10 * 60_000,
-    queryFn: async (): Promise<{ items: KindInfo[]; fallback: boolean }> => {
-      try {
-        const res = await rawJson<KindInfo[] | { items: KindInfo[] }>('/v1/evaluators/catalog')
-        return { items: Array.isArray(res) ? res : res.items, fallback: false }
-      } catch (e) {
-        if (e instanceof ApiError && (e.status === 404 || e.status === 501 || e.status === 405)) return { items: fallbackCatalog(), fallback: true }
-        throw e
-      }
-    },
+    queryFn: async () => ({ items: (await unwrap(http.GET('/v1/evaluators/catalog', {}))).items as unknown as KindInfo[] }),
   })
 }
 
