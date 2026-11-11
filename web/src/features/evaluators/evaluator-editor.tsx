@@ -292,8 +292,8 @@ export function EvaluatorEditor({ id, newKind, onBack, onSaved }: { id?: string;
       </div>
 
       {dirty && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
-          <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="sticky bottom-0 z-20 -mx-4 border-t sm:-mx-6 lg:-mx-8 border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <span className="text-sm text-text-2">{id ? 'Unsaved changes. Saving bumps the evaluator version.' : 'Ready to save this evaluator.'}</span>
             <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={onBack}>

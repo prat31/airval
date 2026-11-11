@@ -162,7 +162,7 @@ function Grader({ queue, onBack }: { queue: S['ReviewQueue']; onBack: () => void
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}><div className="h-full rounded-full bg-accent transition-[width] duration-200" style={{ width: `${progress * 100}%` }} /></div>
         </div>
       </div>
-      {items.isLoading ? (
+      {items.isPending ? (
         <Skeleton className="h-96 w-full" />
       ) : items.error ? (
         <Card><ErrorPanel error={items.error} onRetry={() => void items.refetch()} /></Card>
@@ -236,7 +236,7 @@ export function ReviewScreen() {
   return (
     <Screen>
       <PageHeader icon={<ClipboardCheck />} title="Review" description="Human grading queues. Calibrate LLM judges and catch what automated scores miss." actions={newButton} />
-      {queues.isLoading ? (
+      {queues.isPending ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 rounded-md" />)}</div>
       ) : queues.error ? (
         <Card><ErrorPanel error={queues.error} onRetry={() => void queues.refetch()} /></Card>
@@ -250,7 +250,7 @@ export function ReviewScreen() {
               <button key={q.id} type="button" onClick={() => patch({ queue: q.id }, { push: true })} className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-ring">
                 <span className="flex items-center justify-between gap-2">
                   <span className="truncate text-base font-semibold text-text">{q.name}</span>
-                  {q.pending_count > 0 ? <Badge variant="accent">{q.pending_count} to review</Badge> : <Badge variant="pass">Done</Badge>}
+                  {q.pending_count > 0 ? <Badge variant="accent">{q.pending_count} to review</Badge> : total === 0 ? <Badge>Empty</Badge> : <Badge variant="pass">Done</Badge>}
                 </span>
                 {q.description && <span className="line-clamp-2 text-sm text-text-2">{q.description}</span>}
                 <span className="flex flex-col gap-1">

@@ -155,7 +155,7 @@ export function DatasetsScreen() {
         <Card>
           <ErrorPanel error={datasets.error} onRetry={() => void datasets.refetch()} />
         </Card>
-      ) : !datasets.isLoading && (datasets.data?.length ?? 0) === 0 ? (
+      ) : !datasets.isPending && (datasets.data?.length ?? 0) === 0 ? (
         <Card>
           <EmptyState
             illustration="datasets"
@@ -178,7 +178,7 @@ export function DatasetsScreen() {
               data={rows}
               columns={columns}
               getRowId={(d) => d.id}
-              loading={datasets.isLoading}
+              loading={datasets.isPending}
               onRowActivate={(d) => open(d.id)}
               empty={<EmptyState compact illustration="search" title="No datasets match" description="Try a different search." />}
             />

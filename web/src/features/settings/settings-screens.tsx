@@ -141,7 +141,7 @@ function Members() {
   })
   return (
     <SectionCard title="Members" description="People with access to this organization." actions={<Button size="sm" icon={<UserPlus />} onClick={() => setInviting(true)}>Invite</Button>}>
-      {members.isLoading ? <Loading /> : members.error ? <ErrorPanel error={members.error} onRetry={() => void members.refetch()} /> : (
+      {members.isPending ? <Loading /> : members.error ? <ErrorPanel error={members.error} onRetry={() => void members.refetch()} /> : (
         <ul className="divide-y divide-border">
           {members.data!.map((m) => (
             <li key={m.user.id} className="flex items-center gap-3 px-4 py-2.5">
@@ -203,7 +203,7 @@ function ApiKeys() {
   })
   return (
     <SectionCard title="API keys" description="Keys for CI and the airval CLI. Send as Authorization: Bearer." actions={<Button size="sm" icon={<Plus />} onClick={() => setCreating(true)}>Create key</Button>}>
-      {keys.isLoading ? <Loading /> : keys.error ? <ErrorPanel error={keys.error} onRetry={() => void keys.refetch()} /> : keys.data!.length === 0 ? (
+      {keys.isPending ? <Loading /> : keys.error ? <ErrorPanel error={keys.error} onRetry={() => void keys.refetch()} /> : keys.data!.length === 0 ? (
         <EmptyState compact illustration="generic" title="No API keys" description="Create a key to start runs from CI." action={<Button size="sm" variant="primary" onClick={() => setCreating(true)}>Create key</Button>} />
       ) : (
         <ul className="divide-y divide-border">
@@ -283,7 +283,7 @@ function Secrets() {
   const nameOk = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name)
   return (
     <SectionCard title="Secrets" description="Encrypted credentials. Reference them as {{ secret &quot;NAME&quot; }}. Values are write-only." actions={<Button size="sm" icon={<Plus />} onClick={() => setEditing('new')}>Add secret</Button>}>
-      {secrets.isLoading ? <Loading /> : secrets.error ? <ErrorPanel error={secrets.error} onRetry={() => void secrets.refetch()} /> : secrets.data!.length === 0 ? (
+      {secrets.isPending ? <Loading /> : secrets.error ? <ErrorPanel error={secrets.error} onRetry={() => void secrets.refetch()} /> : secrets.data!.length === 0 ? (
         <EmptyState compact illustration="generic" title="No secrets yet" description="Store API keys for your targets and LLM judges here." action={<Button size="sm" variant="primary" onClick={() => setEditing('new')}>Add secret</Button>} />
       ) : (
         <ul className="divide-y divide-border">
@@ -384,7 +384,7 @@ function Notifications() {
   const valid = name.trim() && (kind === 'email' ? recipients.length > 0 : /^https?:\/\//.test(url) || url.includes('{{'))
   return (
     <SectionCard title="Notifications" description="Tell Slack, a webhook or email when runs finish or gates fail." actions={<Button size="sm" icon={<Plus />} onClick={() => setEditing('new')}>Add channel</Button>}>
-      {channels.isLoading ? <Loading /> : channels.error ? <ErrorPanel error={channels.error} onRetry={() => void channels.refetch()} /> : channels.data!.length === 0 ? (
+      {channels.isPending ? <Loading /> : channels.error ? <ErrorPanel error={channels.error} onRetry={() => void channels.refetch()} /> : channels.data!.length === 0 ? (
         <EmptyState compact illustration="generic" title="No channels yet" description="Add a Slack webhook, a generic webhook or an email list." action={<Button size="sm" variant="primary" onClick={() => setEditing('new')}>Add channel</Button>} />
       ) : (
         <ul className="divide-y divide-border">

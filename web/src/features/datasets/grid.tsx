@@ -327,7 +327,7 @@ export function ExampleGrid({ rows, columns, readOnly, loading, hasMore, loading
                             e.stopPropagation()
                           }}
                           onBlur={() => commit(null)}
-                          onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
+                          onFocus={(e) => (e.currentTarget.value.length > 1 ? e.currentTarget.select() : e.currentTarget.setSelectionRange(1, 1))}
                           className={cn('absolute left-0 top-0 z-10 min-h-9 w-full resize-none rounded-sm border border-accent bg-surface px-3 py-1.5 text-sm text-text shadow-popover focus:outline-none', col.kind === 'input' && 'font-mono text-xs')}
                           aria-label={`Edit ${col.label}`}
                         />

@@ -108,7 +108,7 @@ export function TargetsScreen() {
         <Card>
           <ErrorPanel error={targets.error} onRetry={() => void targets.refetch()} />
         </Card>
-      ) : !targets.isLoading && (targets.data?.length ?? 0) === 0 ? (
+      ) : !targets.isPending && (targets.data?.length ?? 0) === 0 ? (
         <Card>
           <EmptyState
             illustration="targets"
@@ -139,7 +139,7 @@ export function TargetsScreen() {
               data={rows}
               columns={columns}
               getRowId={(t) => t.id}
-              loading={targets.isLoading}
+              loading={targets.isPending}
               onRowActivate={(t) => void navigate({ to: '/o/$org/p/$project/targets/$target', params: { ...ctx.params, target: t.id } })}
               empty={<EmptyState compact illustration="search" title="No targets match" description="Try a different search or clear the filters." />}
             />

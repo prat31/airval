@@ -110,7 +110,7 @@ export function SuitesScreen() {
       <PageHeader icon={<Layers />} title="Suites" description="Reusable evaluation definitions: data, evaluators, gates and triggers." actions={newSuite} />
       {suites.error ? (
         <Card><ErrorPanel error={suites.error} onRetry={() => void suites.refetch()} /></Card>
-      ) : !suites.isLoading && (suites.data?.length ?? 0) === 0 ? (
+      ) : !suites.isPending && (suites.data?.length ?? 0) === 0 ? (
         <Card><EmptyState illustration="suites" title="Create your first suite" description="A suite pairs a dataset version with evaluators and gates. Run it manually, on a schedule or from CI." action={newSuite} /></Card>
       ) : (
         <>
@@ -121,7 +121,7 @@ export function SuitesScreen() {
               data={rows}
               columns={columns}
               getRowId={(s) => s.id}
-              loading={suites.isLoading}
+              loading={suites.isPending}
               onRowActivate={(s) => void navigate({ to: '/o/$org/p/$project/suites/$suite', params: { ...ctx.params, suite: s.slug } })}
               empty={<EmptyState compact illustration="search" title="No suites match" />}
             />

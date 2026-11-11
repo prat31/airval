@@ -81,7 +81,7 @@ export function EvaluatorsScreen() {
 
   const kindInfo = useMemo(() => new Map((catalog.data?.items ?? []).map((k) => [k.kind, k])), [catalog.data])
   const hasOwn = (evaluators.data?.length ?? 0) > 0
-  const tab = str(search.tab, hasOwn || evaluators.isLoading ? 'library' : 'catalog')
+  const tab = str(search.tab, hasOwn || evaluators.isPending ? 'library' : 'catalog')
 
   const columns: ColumnDef<S['Evaluator'], unknown>[] = [
       {
@@ -162,7 +162,7 @@ export function EvaluatorsScreen() {
       {tab === 'library' ? (
         evaluators.error ? (
           <Card><ErrorPanel error={evaluators.error} onRetry={() => void evaluators.refetch()} /></Card>
-        ) : !evaluators.isLoading && !hasOwn ? (
+        ) : !evaluators.isPending && !hasOwn ? (
           <Card>
             <EmptyState
               illustration="evaluators"
@@ -180,14 +180,14 @@ export function EvaluatorsScreen() {
                 data={rows}
                 columns={columns}
                 getRowId={(e) => e.id}
-                loading={evaluators.isLoading}
+                loading={evaluators.isPending}
                 onRowActivate={(e) => patch({ edit: e.id }, { push: true })}
                 empty={<EmptyState compact illustration="search" title="No evaluators match" />}
               />
             </Card>
           </>
         )
-      ) : catalog.isLoading ? (
+      ) : catalog.isPending ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 9 }, (_, i) => <Skeleton key={i} className="h-28 w-full rounded-md" />)}
         </div>
