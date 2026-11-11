@@ -168,3 +168,19 @@ async function projectId(p: Page): Promise<string> {
   const list = await (await p.request.get(`/v1/projects?org_id=${me.orgs[0].id}&slug=sample-support-copilot`)).json()
   return list.items[0].id
 }
+
+test('signed out: a deep link redirects to login once, then returns after sign-in', async ({ browser }) => {
+  // Regression: the guard used to re-read the location while the redirect committed, nesting
+  // `/login?next=…` inside itself until the tab crashed.
+  const ctx = await browser.newContext({ baseURL: base() })
+  const anon = await ctx.newPage()
+  const deep = new URL(page.url()).pathname
+  await anon.goto(deep)
+  await expect(anon).toHaveURL((u) => u.pathname === '/login' && u.searchParams.get('next') === deep)
+  await expect(anon.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await anon.getByLabel('Email').fill(owner.email)
+  await anon.getByLabel('Password').fill(owner.password)
+  await anon.getByRole('button', { name: 'Sign in' }).click()
+  await expect(anon).toHaveURL((u) => u.pathname === deep)
+  await ctx.close()
+})

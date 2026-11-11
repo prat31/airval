@@ -2,6 +2,7 @@
  * Route guards: resolve session → organization → project before rendering the app shell.
  */
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link, Navigate, useParams, useRouterState } from '@tanstack/react-router'
 import { RotateCw } from 'lucide-react'
 import { AppShell } from '@/app/shell'
@@ -58,9 +59,16 @@ function GateError({ error, retry }: { error: unknown; retry: () => void }) {
   )
 }
 
+/**
+ * Redirect to /login, remembering where the user was. The `next` target is captured once, on first render:
+ * reading it live made the guard (still mounted while the router commits the redirect) see `/login?next=…`
+ * as the new location and navigate again with that nested inside `next`, growing the URL exponentially
+ * until the tab crashed.
+ */
 function useLoginRedirect() {
-  const pathname = useRouterState({ select: (s) => s.location.href })
-  return <Navigate to="/login" search={{ next: pathname }} replace />
+  const href = useRouterState({ select: (s) => s.location.href })
+  const [next] = useState(() => (href.startsWith('/login') || href.startsWith('/setup') ? undefined : href))
+  return <Navigate to="/login" search={next ? { next } : {}} replace />
 }
 
 /** `/` → first org → first project (or setup / login / onboarding). */

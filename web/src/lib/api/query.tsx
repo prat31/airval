@@ -3,6 +3,27 @@ import { useState, type ReactNode } from 'react'
 import { toast } from '@/components/ui/toast'
 import { ApiError } from './client'
 
+// A session that expires mid-use sends the user to sign in. This goes through the router (registered by main.tsx)
+// rather than a full page load: route guards may already be redirecting, and two competing navigations to
+// /login (one same-document, one cross-document) wedged the tab.
+let unauthorizedHandler: (() => void) | undefined
+let redirecting = false
+export function setUnauthorizedHandler(fn: () => void) {
+  unauthorizedHandler = fn
+}
+function onUnauthorized() {
+  const path = location.pathname
+  if (redirecting || path.startsWith('/login') || path.startsWith('/setup')) return
+  redirecting = true
+  queueMicrotask(() => {
+    try {
+      unauthorizedHandler?.()
+    } finally {
+      redirecting = false
+    }
+  })
+}
+
 export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -17,9 +38,7 @@ export function createQueryClient() {
     },
     queryCache: new QueryCache({
       onError: (err) => {
-        if (err instanceof ApiError && err.isUnauthorized && !location.pathname.startsWith('/login')) {
-          location.assign(`/login?next=${encodeURIComponent(location.pathname)}`)
-        }
+        if (err instanceof ApiError && err.isUnauthorized) onUnauthorized()
       },
     }),
     mutationCache: new MutationCache({
