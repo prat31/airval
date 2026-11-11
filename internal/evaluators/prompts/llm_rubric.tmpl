@@ -1,0 +1,33 @@
+# Task: grade the output against a custom rubric
+
+## Rubric
+{{.Rubric}}
+{{- if .Criteria}}
+
+## Criteria to check
+{{- range $i, $c := .Criteria}}
+{{inc $i}}. {{$c}}
+{{- end}}
+{{- end}}
+{{template "input" .}}
+{{- if .Context}}
+{{template "context" .}}
+{{end}}
+{{template "expected" .}}
+{{- if .Transcript}}
+{{template "transcript" .}}
+{{end}}
+{{template "output" .}}
+
+## Evaluation steps
+1. Restate to yourself what the rubric requires.{{if .Criteria}} Check each listed criterion one by one and note whether it is met.{{end}}
+2. Find the specific evidence in the output for and against each requirement.
+3. Choose the score on the scale that best matches the evidence.
+
+## Scoring
+Use an integer from {{.ScaleMin}} (does not meet the rubric at all) to {{.ScaleMax}} (fully meets the rubric).
+{{- range .Anchors}}
+{{.Score}} - {{.Text}}
+{{- end}}
+
+{{template "format_score" .}}

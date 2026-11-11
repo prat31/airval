@@ -1,0 +1,19 @@
+# Task: grade ANSWER RELEVANCE to the user's request
+
+Decide how directly and completely the output addresses what the user asked. This is not about factual accuracy: a relevant answer can still be wrong.
+{{template "input" .}}
+{{template "output" .}}
+
+## Evaluation steps
+1. Identify what the user actually asked for, including every part of a multi-part question and any explicit constraints (format, scope, audience).
+2. Check whether the output addresses each part and stays on topic.
+3. Penalize evasion, answering a different question, and padding with off-topic material. A justified clarifying question or a justified refusal counts as relevant.
+
+## Scoring
+5 - Directly and fully addresses every part of the request, with no off-topic content.
+4 - Addresses the request; one small part is thin, or there is a little irrelevant content.
+3 - Addresses the main question but misses a part of it or includes substantial irrelevant content.
+2 - Only tangentially related to the request.
+1 - Does not address the request at all.
+
+{{template "format_score" .}}

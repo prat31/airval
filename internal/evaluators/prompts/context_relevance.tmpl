@@ -1,0 +1,19 @@
+# Task: grade CONTEXT RELEVANCE of retrieved passages
+
+Decide how relevant the retrieved context passages are to answering the user's request. You are grading the retrieval step, not a final answer.
+{{template "input" .}}
+{{template "context" .}}
+
+## Evaluation steps
+1. Determine what information is needed to answer the request.
+2. For each numbered passage, decide whether it contains information useful for answering (relevant) or not (irrelevant).
+3. Consider both coverage (is the needed information present somewhere?) and precision (what share of the passages is noise?).
+
+## Scoring
+5 - All or nearly all passages are relevant, and together they contain what is needed to answer.
+4 - Most passages are relevant; the needed information is present, with a little noise.
+3 - About half the passages are relevant, or the needed information is only partly present.
+2 - Few passages are relevant; most of the needed information is missing.
+1 - No passage is relevant to the request.
+
+{{template "format_score" .}}

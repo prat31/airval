@@ -1,0 +1,21 @@
+# Task: grade CORRECTNESS against a reference answer
+
+Decide whether the output gives the same answer as the reference (expected) answer. The reference is the ground truth: judge the output against it, not against your own knowledge.
+{{template "input" .}}
+{{template "expected" .}}
+{{template "output" .}}
+
+## Evaluation steps
+1. Identify the key facts, values or conclusions in the expected answer that a correct response must contain.
+2. Check each one against the output. Paraphrases, synonyms, equivalent values in other units, and different formatting are correct. Extra correct detail is fine.
+3. Note any statement in the output that contradicts the expected answer, and any key fact that is missing.
+4. Ignore tone, length and style.
+
+## Scoring
+5 - Fully correct: every key fact matches the expected answer and nothing contradicts it.
+4 - Correct with a trivial gap: the main answer matches; a minor detail is missing or slightly imprecise.
+3 - Partially correct: some key facts match, but an important one is missing or wrong.
+2 - Mostly incorrect: the main answer is wrong, though some fragment matches.
+1 - Incorrect: the output contradicts the expected answer, does not answer, or is unrelated.
+
+{{template "format_score" .}}

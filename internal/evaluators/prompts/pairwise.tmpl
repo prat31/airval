@@ -1,0 +1,29 @@
+# Task: compare two responses to the same request
+
+Decide which response is better {{if or .Rubric .Criteria}}according to the criteria below{{else}}overall: more correct, more helpful, and better at following the request{{end}}. The responses are labeled A and B; their order is arbitrary and must not influence you. Do not prefer a response for being longer.
+{{- if .Rubric}}
+
+## Criteria
+{{.Rubric}}
+{{- end}}
+{{- range $i, $c := .Criteria}}
+- {{$c}}
+{{- end}}
+{{template "input" .}}
+{{template "expected" .}}
+<response_a>
+{{.A}}
+</response_a>
+
+<response_b>
+{{.B}}
+</response_b>
+
+## Evaluation steps
+1. Identify what an ideal response to this request must do.
+2. Assess the concrete strengths and flaws of A, then of B.
+3. Decide. Answer "tie" only when the responses are genuinely equivalent in quality, never as a hedge.
+
+## Output format
+Respond with ONLY this JSON object:
+{"reason": "<your comparison in 2-6 sentences>", "verdict": "A" | "B" | "tie"}

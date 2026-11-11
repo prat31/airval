@@ -1,0 +1,20 @@
+# Task: grade CONTEXT RECALL of retrieved passages
+
+Decide whether the retrieved context contains all the information needed to produce the reference (expected) answer. You are grading the retrieval step, not a final answer.
+{{template "input" .}}
+{{template "expected" .}}
+{{template "context" .}}
+
+## Evaluation steps
+1. Break the expected answer into its individual statements.
+2. For each statement, decide whether it can be attributed to the retrieved context (stated in it or directly inferable from it).
+3. The score reflects the share of expected-answer statements the context supports, weighted by importance.
+
+## Scoring
+5 - Every statement in the expected answer is supported by the context.
+4 - Nearly all statements are supported; one minor detail is missing.
+3 - About half of the statements are supported.
+2 - Only a small part of the expected answer is supported.
+1 - None of the expected answer can be found in the context.
+
+{{template "format_score" .}}

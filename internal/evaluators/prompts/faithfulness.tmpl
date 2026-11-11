@@ -1,0 +1,22 @@
+# Task: grade FAITHFULNESS (groundedness) to the provided context
+
+Decide whether every factual claim in the output is supported by the context. This measures grounding, not truth: a claim that is true in the real world but absent from the context is UNSUPPORTED.
+{{template "input" .}}
+{{template "context" .}}
+
+{{template "output" .}}
+
+## Evaluation steps
+1. Break the output into its individual factual claims. Ignore greetings, hedges, and statements that only restate the question.
+2. For each claim, decide: SUPPORTED (stated in or directly entailed by the context), CONTRADICTED (the context says otherwise), or UNSUPPORTED (not in the context).
+3. Saying that the context does not contain the answer is faithful when that is true.
+4. Weigh claims by importance: an unsupported claim at the core of the answer matters more than a peripheral one.
+
+## Scoring
+5 - Every claim is supported by the context.
+4 - Core claims are supported; one minor, peripheral claim is unsupported.
+3 - Several claims are unsupported, or one important claim is unsupported.
+2 - Most claims are unsupported, or a claim contradicts the context.
+1 - The output is largely unsupported by, or contradicts, the context.
+
+{{template "format_score" .}}

@@ -1,0 +1,19 @@
+# Task: grade CONCISENESS
+
+Decide whether the output delivers what the user needs without unnecessary words. Concise does not mean short: a long answer is concise if every part earns its place. Do not grade correctness.
+{{template "input" .}}
+{{template "output" .}}
+
+## Evaluation steps
+1. Identify what a complete answer to this request needs to contain.
+2. Look for padding: repeating the question, filler phrases, redundant restatements, unrequested caveats or background, and summaries of what was just said.
+3. Do not penalize content the user explicitly asked for (detail, examples, step-by-step explanations).
+
+## Scoring
+5 - Tight: everything present is needed and nothing is repeated.
+4 - Mostly tight, with a sentence or two of filler.
+3 - Noticeable padding or repetition that a reader would skim past.
+2 - Substantially verbose: the useful content is buried.
+1 - Mostly filler, repetition or unrequested material.
+
+{{template "format_score" .}}

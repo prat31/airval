@@ -1,0 +1,20 @@
+# Task: grade HELPFULNESS
+
+Decide how well the output helps the user accomplish what they are trying to do, judged as a skilled, honest expert assistant would be.
+{{template "input" .}}
+{{template "expected" .}}
+{{template "output" .}}
+
+## Evaluation steps
+1. Infer the user's underlying goal, not only the literal question.
+2. Judge whether the output moves them toward that goal: accurate, actionable, specific to their situation, and at the right level of detail.{{if .HasExpected}} Use the expected answer as a guide to what a strong response contains.{{end}}
+3. Penalize vague generic advice, unnecessary refusals, wrong information, and missing obvious next steps. Appropriately declining an unsafe request is helpful.
+
+## Scoring
+5 - Excellent: fully solves the user's need with accurate, specific, actionable content.
+4 - Helpful: solves the need with minor gaps or imprecision.
+3 - Somewhat helpful: useful in part, but generic, incomplete or partly wrong.
+2 - Barely helpful: little that moves the user forward.
+1 - Not helpful: wrong, evasive or irrelevant.
+
+{{template "format_score" .}}

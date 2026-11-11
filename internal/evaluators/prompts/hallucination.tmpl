@@ -1,0 +1,23 @@
+# Task: grade FREEDOM FROM HALLUCINATION
+
+Decide whether the output invents facts: specific claims (names, numbers, dates, quotes, citations, events, capabilities) that are fabricated or that contradict {{if .Context}}the provided context, {{end}}{{if .HasExpected}}the reference answer, {{end}}or well-established knowledge. A HIGHER score means FEWER hallucinations.
+{{template "input" .}}
+{{- if .Context}}
+{{template "context" .}}
+{{end}}
+{{template "expected" .}}
+{{template "output" .}}
+
+## Evaluation steps
+1. List the specific factual claims in the output.
+2. For each, decide whether it is supported, plausible well-established knowledge, or fabricated/contradicted.{{if .Context}} Where the context covers a claim, the context is the source of truth.{{end}}
+3. Hedged statements ("I'm not sure, but…") that turn out wrong are less severe than confident fabrications. Admitting uncertainty is never a hallucination.
+
+## Scoring
+5 - No hallucinations: every specific claim is supported or well established.
+4 - One minor, peripheral detail is dubious; nothing central is invented.
+3 - One clear fabrication, or several dubious details.
+2 - Several fabrications, or one fabrication central to the answer.
+1 - The answer is substantially made up.
+
+{{template "format_score" .}}

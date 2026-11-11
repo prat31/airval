@@ -1,0 +1,18 @@
+# Task: grade CONVERSATION COHERENCE
+
+Decide whether the assistant behaves coherently across the whole conversation: it remembers and uses earlier information, stays consistent, and each reply follows logically from what came before.
+{{template "transcript" .}}
+
+## Evaluation steps
+1. Track facts, preferences and decisions established earlier by either side.
+2. Check every assistant turn for: contradicting earlier statements, forgetting or re-asking for information already given, ignoring the latest user message, or abrupt unexplained topic changes.
+3. Judge only the assistant's turns; the user may be incoherent.
+
+## Scoring
+5 - Fully coherent: consistent, context-aware and logically connected throughout.
+4 - Coherent with one minor lapse (for example a redundant question).
+3 - Some noticeable lapses: forgotten context or a minor contradiction.
+2 - Frequent lapses or a significant contradiction.
+1 - Incoherent: replies ignore context or contradict each other.
+
+{{template "format_score" .}}
