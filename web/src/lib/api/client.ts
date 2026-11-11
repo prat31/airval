@@ -79,7 +79,8 @@ const errorMiddleware: Middleware = {
 }
 
 export const api = createClient<paths>({
-  baseUrl: '/v1',
+  // Paths in schema.d.ts already carry the /v1 prefix.
+  baseUrl: '',
   credentials: 'include',
   headers: { Accept: 'application/json' },
 })
@@ -88,7 +89,7 @@ api.use(csrfMiddleware, errorMiddleware)
 /**
  * Unwrap an openapi-fetch result: returns `data`, throws ApiError otherwise.
  * Use inside TanStack Query `queryFn`/`mutationFn`:
- *   queryFn: () => unwrap(api.GET('/projects/{p}', { params: { path: { p } } }))
+ *   queryFn: () => unwrap(api.GET('/v1/projects/{project}', { params: { path: { project } } }))
  */
 export async function unwrap<T>(promise: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   const { data, error, response } = await promise

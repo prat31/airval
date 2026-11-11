@@ -38,15 +38,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Kbd } from '@/components/ui/kbd'
 import { Sidebar, SidebarItem, SidebarSection, useSidebar } from '@/components/ui/sidebar'
-import { toast } from '@/components/ui/toast'
 import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/cn'
 import { modKey, useHotkeys, useMediaQuery } from '@/lib/hotkeys'
 import { useTheme, type ThemePreference } from '@/lib/theme'
+import { useCrumbNames } from './crumb-names'
 import { LiveRunIndicator } from './live-runs'
 import { projectNav, settingsNav } from './nav'
 import { ShortcutsSheet } from './shortcuts-sheet'
 import { themeOptions, ThemeToggle } from './theme-toggle'
+import { useLogout } from '@/features/auth/api'
+import { NewOrgDialog, NewProjectDialog } from '@/features/auth/workspace-dialogs'
 import { initials, useWorkspace, type Project } from './workspace'
 
 const SIDEBAR_KEY = 'airval.sidebar.collapsed'
@@ -91,7 +93,10 @@ function OrgSwitcher() {
   const { orgs, org } = useWorkspace()
   const { collapsed } = useSidebar()
   const navigate = useNavigate()
+  const [newOrg, setNewOrg] = useState(false)
   return (
+    <>
+    <NewOrgDialog open={newOrg} onOpenChange={setNewOrg} />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -124,11 +129,12 @@ function OrgSwitcher() {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem icon={<Plus />} onSelect={() => toast.info('Creating organizations arrives with auth (milestone 2).')}>
+        <DropdownMenuItem icon={<Plus />} onSelect={() => setNewOrg(true)}>
           Create organization
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   )
 }
 
@@ -136,6 +142,7 @@ function ProjectSwitcher() {
   const { projects, project, org } = useWorkspace()
   const { collapsed } = useSidebar()
   const navigate = useNavigate()
+  const [newProject, setNewProject] = useState(false)
   if (!project) return null
   const trigger = (
     <button
@@ -156,6 +163,8 @@ function ProjectSwitcher() {
     </button>
   )
   return (
+    <>
+    <NewProjectDialog open={newProject} onOpenChange={setNewProject} orgId={org.id} orgSlug={org.slug} />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent className="w-60" side={collapsed ? 'right' : 'bottom'}>
@@ -173,11 +182,12 @@ function ProjectSwitcher() {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem icon={<Plus />} onSelect={() => navigate({ to: '/onboarding' })}>
+        <DropdownMenuItem icon={<Plus />} onSelect={() => setNewProject(true)}>
           New project
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   )
 }
 
@@ -185,6 +195,7 @@ function UserMenu({ onShortcuts }: { onShortcuts: () => void }) {
   const { user, org, project } = useWorkspace()
   const { preference, setPreference } = useTheme()
   const navigate = useNavigate()
+  const logout = useLogout()
   return (
     <DropdownMenu>
       <Tooltip content={user.name}>
@@ -229,7 +240,7 @@ function UserMenu({ onShortcuts }: { onShortcuts: () => void }) {
           Documentation
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem icon={<LogOut />} onSelect={() => navigate({ to: '/login' })}>
+        <DropdownMenuItem icon={<LogOut />} onSelect={() => logout.mutate(undefined, { onSettled: () => navigate({ to: '/login', search: {} }) })}>
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -249,6 +260,7 @@ declare module '@tanstack/react-router' {
 function useCrumbs(): Crumb[] {
   const matches = useMatches()
   const { org, project } = useWorkspace()
+  const names = useCrumbNames(project?.id)
   return useMemo(() => {
     const crumbs: Crumb[] = []
     if (project) crumbs.push({ label: project.name, href: `/o/${org.slug}/p/${project.slug}/overview`, icon: <ProjectDot project={project} /> })
@@ -257,12 +269,13 @@ function useCrumbs(): Crumb[] {
       if (!c) continue
       const parent = m.staticData?.parentCrumb
       if (parent && project) crumbs.push({ label: parent.label, href: `/o/${org.slug}/p/${project.slug}/${parent.path}` })
-      const label = typeof c === 'function' ? c(m.params as Record<string, string>) : c
+      const entity = (['run', 'suite', 'dataset', 'target'] as const).find((e) => m.routeId.endsWith(`$${e}`))
+      const label = (entity && names[entity]) || (typeof c === 'function' ? c(m.params as Record<string, string>) : c)
       if (crumbs.at(-1)?.label === label) continue
       crumbs.push({ label, href: m.pathname })
     }
     return crumbs
-  }, [matches, org.slug, project])
+  }, [matches, org.slug, project, names.run, names.suite, names.dataset, names.target])
 }
 
 function TopBar({ onToggleSidebar, onOpenPalette, onShortcuts }: { onToggleSidebar: () => void; onOpenPalette: () => void; onShortcuts: () => void }) {
@@ -359,7 +372,7 @@ export function AppShell() {
       {
         heading: 'Actions',
         items: [
-          { id: 'run-suite', label: 'Run suite…', icon: <Play />, keywords: ['start', 'execute'], onSelect: () => navigate({ to: '/o/$org/p/$project/suites', params }) },
+          { id: 'run-suite', label: 'Run suite…', icon: <Play />, keywords: ['start', 'execute'], onSelect: () => navigate({ to: '/o/$org/p/$project/runs', params, search: {} }) },
           { id: 'new-suite', label: 'New suite…', icon: <Layers />, onSelect: () => navigate({ to: '/o/$org/p/$project/suites/new', params }) },
           { id: 'new-dataset', label: 'New dataset…', icon: <Database />, keywords: ['import', 'upload'], onSelect: () => navigate({ to: '/o/$org/p/$project/datasets', params }) },
           { id: 'new-project', label: 'New project…', icon: <Plus />, onSelect: () => navigate({ to: '/onboarding' }) },
