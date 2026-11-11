@@ -394,8 +394,9 @@ func walkDescend(n any, fn func(any)) {
 	fn(n)
 	switch v := n.(type) {
 	case map[string]any:
-		for _, c := range v {
-			walkDescend(c, fn)
+		// Sorted, like the wildcard and filter steps, so `$..x` results don't depend on map order.
+		for _, k := range sortedKeys(v) {
+			walkDescend(v[k], fn)
 		}
 	case []any:
 		for _, c := range v {
