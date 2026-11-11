@@ -98,23 +98,6 @@ type finalState struct {
 	results int
 }
 
-func gateTags(raw json.RawMessage, into map[string]bool) {
-	var g apiGate
-	if json.Unmarshal(raw, &g) != nil {
-		return
-	}
-	var walk func(apiGate)
-	walk = func(n apiGate) {
-		if n.Tag != "" {
-			into[n.Tag] = true
-		}
-		for _, a := range n.Args {
-			walk(a)
-		}
-	}
-	walk(g)
-}
-
 func (w *Engine) computeFinal(ctx context.Context, run store.Run, cfg planner.RunConfig) (*finalState, error) {
 	now := time.Now().UTC()
 	infos := make([]aggregate.EvaluatorInfo, 0, len(cfg.Evaluators))
@@ -140,22 +123,14 @@ func (w *Engine) computeFinal(ctx context.Context, run store.Run, cfg planner.Ru
 			weights[id] = 1
 		}
 	}
-	tags := map[string]bool{}
 	needCompare := false
 	for _, g := range cfg.Gates {
-		gateTags(g.Expr, tags)
 		if strings.Contains(string(g.Expr), "regression_vs_baseline") {
 			needCompare = true
 		}
 	}
 	agg := aggregate.New(infos, aggregate.Options{})
 	ttft := aggregate.NewStream(0)
-	tagAggs := map[string]*aggregate.Aggregator{}
-	tagTTFT := map[string]*aggregate.Stream{}
-	for t := range tags {
-		tagAggs[t] = aggregate.New(infos, aggregate.Options{NoTagSlices: true, NoPerExample: true})
-		tagTTFT[t] = aggregate.NewStream(0)
-	}
 	var fin store.RunFinish
 	cached := 0
 	err := w.d.Store.IterateRunResults(ctx, run.ID, func(r store.Result) error {
@@ -170,14 +145,6 @@ func (w *Engine) computeFinal(ctx context.Context, run store.Run, cfg planner.Ru
 		agg.Add(rec)
 		if r.TTFTMs != nil {
 			ttft.Add(*r.TTFTMs)
-		}
-		for _, t := range r.Tags {
-			if a, ok := tagAggs[t]; ok {
-				a.Add(rec)
-				if r.TTFTMs != nil {
-					tagTTFT[t].Add(*r.TTFTMs)
-				}
-			}
 		}
 		fin.Completed++
 		switch r.Status {
@@ -217,16 +184,11 @@ func (w *Engine) computeFinal(ctx context.Context, run store.Run, cfg planner.Ru
 			w.d.Logger.Warn("finalize: load baseline", "run_id", run.ID, "err", err)
 		}
 	}
-	envFor := func(tag string) gateEnv {
-		if tag == "" {
-			return gateEnv{base: aggregate.SummaryEnv{Summary: sum, Comparison: cmp}, ttft: ttft.Dist(aggregate.HistNone)}
-		}
-		return gateEnv{base: aggregate.SummaryEnv{Summary: tagAggs[tag].Summary()}, ttft: tagTTFT[tag].Dist(aggregate.HistNone)}
-	}
+	env := gateEnv{base: aggregate.SummaryEnv{Summary: sum, Comparison: cmp}, ttft: ttft.Dist(aggregate.HistNone)}
 	var gates []notify.GateResult
 	var gatePassed *bool
 	for _, g := range cfg.Gates {
-		gr := evalGate(g.ID.String(), g.Name, g.Expr, envFor, names)
+		gr := evalGate(g.ID.String(), g.Name, g.Expr, env, names)
 		gates = append(gates, gr)
 		ok := gr.Passed && (gatePassed == nil || *gatePassed)
 		gatePassed = &ok
