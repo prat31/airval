@@ -39,6 +39,7 @@ func Run(t *testing.T, open Opener) {
 		{"Transactions", testTx},
 		{"Engine", testEngine},
 		{"Insights", testInsights},
+		{"Enterprise", testEnterprise},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -791,7 +792,7 @@ func testMisc(t *testing.T, s store.Store) {
 	must(t, s.DeleteNotificationChannel(ctx, ch.ID))
 
 	must(t, s.AppendAudit(ctx, &store.AuditEntry{OrgID: f.org.ID, ActorID: &f.user.ID, Actor: f.user.Email, Action: "secret.create", Target: "secret:1"}))
-	au, err := s.ListAudit(ctx, f.org.ID, store.ListParams{})
+	au, err := s.ListAudit(ctx, store.AuditFilter{OrgID: f.org.ID}, store.ListParams{})
 	must(t, err)
 	eq(t, "audit", len(au.Items), 1)
 

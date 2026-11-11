@@ -24,7 +24,7 @@ import { DatasetDetailScreen } from './features/datasets/dataset-detail'
 import { DatasetsScreen } from './features/datasets/datasets-screen'
 import { EvaluatorsScreen } from './features/evaluators/evaluators-screen'
 import { ReviewScreen } from './features/review/review-screen'
-import { SettingsLayout, SettingsSectionScreen } from './features/settings/settings-screens'
+import { sectionLabel, SettingsLayout, SettingsSectionScreen } from './features/settings/settings-screens'
 import { SuiteDetailScreen } from './features/suites/suite-detail'
 import { SuiteNewScreen } from './features/suites/suite-new'
 import { SuitesScreen } from './features/suites/suites-screen'
@@ -46,7 +46,10 @@ const loginRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/login',
   component: LoginScreen,
-  validateSearch: (s: Record<string, unknown>): { next?: string } => (typeof s.next === 'string' ? { next: s.next } : {}),
+  validateSearch: (s: Record<string, unknown>): { next?: string; sso_error?: string } => ({
+    ...(typeof s.next === 'string' ? { next: s.next } : {}),
+    ...(typeof s.sso_error === 'string' ? { sso_error: s.sso_error } : {}),
+  }),
 })
 const setupRoute = createRoute({ getParentRoute: () => authLayout, path: '/setup', component: SetupScreen })
 const onboardingRoute = createRoute({
@@ -118,7 +121,7 @@ const settingsSectionRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '$section',
   component: SettingsSectionScreen,
-  staticData: { crumb: (p) => (p.section ?? '').replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) },
+  staticData: { crumb: (p) => sectionLabel(p.section ?? '') },
 })
 
 // Dev-only component showcase. The lazy import is dead-code-eliminated from production builds.

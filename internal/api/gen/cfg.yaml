@@ -14,3 +14,45 @@ output-options:
     - fireWebhookTrigger
     - oidcStart
     - oidcCallback
+    # enterprise edition (ee/ serves these as raw routes; core answers 501)
+    - samlMetadata
+    - samlStart
+    - samlACS
+    - listSSOProviders
+    - createSSOProvider
+    - getSSOProvider
+    - updateSSOProvider
+    - deleteSSOProvider
+    - listSCIMTokens
+    - createSCIMToken
+    - deleteSCIMToken
+    - getSCIMSettings
+    - putSCIMSettings
+    - listRoles
+    - createCustomRole
+    - updateCustomRole
+    - deleteCustomRole
+    - listRoleAssignments
+    - setRoleAssignment
+    - deleteRoleAssignment
+    - exportAuditLog
+    - getAuditSettings
+    - putAuditSettings
+    - listRetentionPolicies
+    - getRetentionPolicy
+    - putRetentionPolicy
+    - deleteRetentionPolicy
+    - getBranding
+    - putBranding
+    - scimListUsers
+    - scimCreateUser
+    - scimGetUser
+    - scimReplaceUser
+    - scimPatchUser
+    - scimDeleteUser
+    - scimListGroups
+    - scimCreateGroup
+    - scimGetGroup
+    - scimReplaceGroup
+    - scimPatchGroup
+    - scimDeleteGroup

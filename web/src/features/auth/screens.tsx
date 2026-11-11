@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, Outlet, useNavigate, useSearch } from '@tanstack/react-router'
-import { ArrowRight, Building2, CircleAlert, Lock, Mail, User } from 'lucide-react'
+import { ArrowRight, Building2, CircleAlert, KeyRound, Lock, Mail, User } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api/client'
+import { authProvidersQuery } from '@/lib/edition'
 import { setupStatusQuery, slugify, useLogin, useSetup } from './api'
 
 export function Logo({ size = 8 }: { size?: 6 | 8 }) {
@@ -70,8 +71,42 @@ function FormError({ error }: { error: unknown }) {
 /** Only same-origin, path-only redirects are honored. */
 const safeNext = (next?: string) => (next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/login') ? next : '/')
 
+const ssoErrors: Record<string, string> = {
+  not_provisioned: 'Your account isn’t set up in this workspace yet. Ask an admin to invite you.',
+  domain_not_allowed: 'Your email domain isn’t allowed for this sign-in method.',
+  email_unverified: 'Your identity provider hasn’t verified your email address.',
+  no_email: 'Your identity provider didn’t share an email address.',
+  deactivated: 'Your account has been deactivated.',
+  state_expired: 'Sign-in took too long. Please try again.',
+  state_missing: 'Sign-in session expired. Please try again.',
+  unknown_provider: 'That sign-in method is no longer available.',
+  provider_unavailable: 'We couldn’t reach your identity provider. Try again shortly.',
+}
+
+function SSOButtons({ next }: { next?: string }) {
+  const providers = useQuery(authProvidersQuery)
+  if (!providers.data?.length) return null
+  return (
+    <div className="flex flex-col gap-2">
+      {providers.data.map((p) => (
+        <Button key={p.id} asChild variant="secondary" className="w-full">
+          <a href={`${p.start_url}?redirect=${encodeURIComponent(safeNext(next))}`}>
+            <KeyRound aria-hidden />
+            Continue with {p.name}
+          </a>
+        </Button>
+      ))}
+      <div className="my-2 flex items-center gap-3 text-xs text-text-muted" role="separator">
+        <span className="h-px flex-1 bg-border" />
+        or use your password
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    </div>
+  )
+}
+
 export function LoginScreen() {
-  const { next } = useSearch({ strict: false }) as { next?: string }
+  const { next, sso_error } = useSearch({ strict: false }) as { next?: string; sso_error?: string }
   const setup = useQuery(setupStatusQuery)
   const login = useLogin()
   const navigate = useNavigate()
@@ -87,6 +122,13 @@ export function LoginScreen() {
 
   return (
     <AuthCard title="Sign in" description="Welcome back. Sign in to your airval workspace.">
+      {sso_error && !login.error && (
+        <div role="alert" className="mb-4 flex items-start gap-2 rounded-md bg-fail-subtle px-3 py-2 text-sm text-fail">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>{ssoErrors[sso_error] ?? 'Single sign-on failed. Try again or contact your admin.'}</span>
+        </div>
+      )}
+      <SSOButtons next={next} />
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate={false}>
         <FormError error={login.error} />
         <Field label="Email">

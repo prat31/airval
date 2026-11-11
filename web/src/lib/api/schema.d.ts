@@ -176,6 +176,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Single sign-on options for the sign-in page (empty in the community edition) */
+        get: operations["listAuthProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/edition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The running edition and its enabled enterprise features */
+        get: operations["getEdition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/saml/{provider}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SAML service provider metadata XML (ee) */
+        get: operations["samlMetadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/saml/{provider}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Begin SAML SSO login (ee) */
+        get: operations["samlStart"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/saml/{provider}/acs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SAML assertion consumer service (HTTP-POST binding) (ee) */
+        post: operations["samlACS"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orgs": {
         parameters: {
             query?: never;
@@ -399,9 +484,263 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Audit log (admin; full coverage in ee) */
+        /** Audit log, newest first (admin; every mutating call is recorded in ee) */
         get: operations["listAuditLog"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/sso-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        /** SSO identity providers (admin, ee) */
+        get: operations["listSSOProviders"];
+        put?: never;
+        /** Add an OIDC or SAML identity provider (owner, ee) */
+        post: operations["createSSOProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/sso-providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getSSOProvider"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteSSOProvider"];
+        options?: never;
+        head?: never;
+        /** Update an identity provider (owner, ee). Omit client_secret to keep it. */
+        patch: operations["updateSSOProvider"];
+        trace?: never;
+    };
+    "/v1/orgs/{org}/scim-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        /** SCIM bearer tokens (owner, ee) */
+        get: operations["listSCIMTokens"];
+        put?: never;
+        /** Create a SCIM bearer token (owner, ee). The plaintext token is returned once. */
+        post: operations["createSCIMToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/scim-tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteSCIMToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/scim-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        get: operations["getSCIMSettings"];
+        /** Default role and SCIM group → role mapping (owner, ee) */
+        put: operations["putSCIMSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        /** Built-in and custom roles plus the permission catalog (ee) */
+        get: operations["listRoles"];
+        put?: never;
+        /** Create a custom role (admin, ee) */
+        post: operations["createCustomRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a custom role; its assignments are removed (admin, ee) */
+        delete: operations["deleteCustomRole"];
+        options?: never;
+        head?: never;
+        patch: operations["updateCustomRole"];
+        trace?: never;
+    };
+    "/v1/orgs/{org}/role-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        /** Org-wide and per-project role assignments (admin, ee) */
+        get: operations["listRoleAssignments"];
+        /** Assign a built-in or custom role to a member, org-wide or for one project (admin, ee) */
+        put: operations["setRoleAssignment"];
+        post?: never;
+        delete: operations["deleteRoleAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/audit-log/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        /** Export the filtered audit log as CSV (admin, ee) */
+        get: operations["exportAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/audit-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        get: operations["getAuditSettings"];
+        /** Audit log retention (owner, ee) */
+        put: operations["putAuditSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/retention-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        /** Per-project data retention policies (admin, ee) */
+        get: operations["listRetentionPolicies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/projects/{project}/retention-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: components["parameters"]["ProjectID"];
+            };
+            cookie?: never;
+        };
+        get: operations["getRetentionPolicy"];
+        /** Delete this project's finished runs older than run_days (admin, ee). Applied hourly by the leader. */
+        put: operations["putRetentionPolicy"];
+        post?: never;
+        delete: operations["deleteRetentionPolicy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/{org}/branding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        /** White-label branding (any member, ee) */
+        get: operations["getBranding"];
+        /** Set product name, logo and accent (admin, ee) */
+        put: operations["putBranding"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1409,6 +1748,76 @@ export interface paths {
         patch: operations["updateAnnotation"];
         trace?: never;
     };
+    "/scim/v2/Users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List users; supports `filter=userName eq "..."` / `externalId eq "..."`, startIndex, count (ee) */
+        get: operations["scimListUsers"];
+        put?: never;
+        post: operations["scimCreateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scim/v2/Users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["scimGetUser"];
+        put: operations["scimReplaceUser"];
+        post?: never;
+        /** Deprovision (removes the membership and signs the user out) */
+        delete: operations["scimDeleteUser"];
+        options?: never;
+        head?: never;
+        patch: operations["scimPatchUser"];
+        trace?: never;
+    };
+    "/scim/v2/Groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["scimListGroups"];
+        put?: never;
+        post: operations["scimCreateGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scim/v2/Groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["scimGetGroup"];
+        put: operations["scimReplaceGroup"];
+        post?: never;
+        delete: operations["scimDeleteGroup"];
+        options?: never;
+        head?: never;
+        patch: operations["scimPatchGroup"];
+        trace?: never;
+    };
     "/hooks/{trigger}": {
         parameters: {
             query?: never;
@@ -1703,6 +2112,11 @@ export interface components {
             action: string;
             target: string;
             diff?: components["schemas"]["JSONValue"];
+            ip?: string;
+            user_agent?: string;
+            request_id?: string;
+            /** @description HTTP status of the call (0 = not an API call) */
+            status?: number;
             /** Format: date-time */
             at: string;
         };
@@ -3370,6 +3784,219 @@ export interface components {
             passed?: boolean | null;
             comment?: string;
         };
+        Edition: {
+            /** @enum {string} */
+            edition: "community" | "enterprise";
+            /** @description Enabled enterprise features */
+            features: components["schemas"]["EnterpriseFeature"][];
+        };
+        /** @enum {string} */
+        EnterpriseFeature: "sso" | "saml" | "scim" | "custom_roles" | "audit_log" | "retention" | "branding";
+        AuthProvider: {
+            /** @description Provider slug */
+            id: string;
+            /** @enum {string} */
+            kind: "oidc" | "saml";
+            name: string;
+            /** @description Navigate here to sign in (append ?redirect=/path) */
+            start_url: string;
+        };
+        AuthProviderList: {
+            items: components["schemas"]["AuthProvider"][];
+        };
+        /** @description A built-in role (owner, admin, editor, viewer) or `custom:<custom role id>` */
+        RoleRef: string;
+        RoleMappingRule: {
+            /** @description Claim / attribute / group value to match (exact */
+            value: string;
+            role: components["schemas"]["RoleRef"];
+        };
+        SSOProviderConfig: {
+            /** @description OIDC issuer URL (discovery at /.well-known/openid-configuration) */
+            issuer?: string;
+            client_id?: string;
+            /** @description Defaults to openid email profile */
+            scopes?: string[];
+            /** @description SAML IdP metadata URL */
+            idp_metadata_url?: string;
+            /** @description SAML IdP metadata XML (instead of a URL) */
+            idp_metadata_xml?: string;
+            /** @description SAML attribute holding the email (default: NameID or the email attribute) */
+            email_attribute?: string;
+            name_attribute?: string;
+            /** @description Only these email domains may sign in (empty = any) */
+            allowed_domains?: string[];
+            /** @description Claim / attribute with groups or roles (e.g. groups) */
+            role_claim?: string;
+            role_mapping?: components["schemas"]["RoleMappingRule"][];
+            default_role?: components["schemas"]["Role"];
+            /** @description Create users and memberships on first sign-in */
+            jit_provisioning?: boolean;
+            /** @description Re-apply role mapping on every sign-in (owners are never changed) */
+            sync_roles?: boolean;
+        };
+        SSOProvider: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            org_id: string;
+            slug: string;
+            /** @enum {string} */
+            kind: "oidc" | "saml";
+            name: string;
+            enabled: boolean;
+            config: components["schemas"]["SSOProviderConfig"];
+            has_client_secret: boolean;
+            /** @description OIDC redirect URI or SAML ACS URL to register with the IdP */
+            redirect_uri: string;
+            /** @description SAML SP metadata URL */
+            metadata_url?: string;
+            /** @description SAML SP entity id */
+            entity_id?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SSOProviderCreate: {
+            /** @enum {string} */
+            kind: "oidc" | "saml";
+            name: string;
+            slug?: string;
+            enabled?: boolean;
+            config: components["schemas"]["SSOProviderConfig"];
+            /** @description OIDC client secret (write-only */
+            client_secret?: string;
+        };
+        SSOProviderUpdate: {
+            name?: string;
+            enabled?: boolean;
+            config?: components["schemas"]["SSOProviderConfig"];
+            /** @description Replaces the client secret; omit to keep it */
+            client_secret?: string;
+        };
+        SSOProviderList: {
+            items: components["schemas"]["SSOProvider"][];
+        };
+        SCIMToken: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            prefix: string;
+            /** Format: date-time */
+            last_used_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        SCIMTokenCreated: components["schemas"]["SCIMToken"] & {
+            /** @description Shown once */
+            token: string;
+            /** @description SCIM base URL to configure in the IdP */
+            base_url: string;
+        };
+        SCIMTokenList: {
+            items: components["schemas"]["SCIMToken"][];
+            base_url: string;
+        };
+        SCIMSettings: {
+            default_role: components["schemas"]["Role"];
+            /** @description SCIM group display name → role. The highest built-in role across a user's groups wins. */
+            group_roles: components["schemas"]["RoleMappingRule"][];
+        };
+        Permission: {
+            /** @description resource:action */
+            id: string;
+            resource: string;
+            action: string;
+            description: string;
+        };
+        BuiltinRole: {
+            role: components["schemas"]["Role"];
+            permissions: string[];
+        };
+        CustomRole: {
+            /** Format: uuid */
+            id: string;
+            key: string;
+            name: string;
+            description: string;
+            permissions: string[];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CustomRoleWrite: {
+            name: string;
+            description?: string;
+            permissions: string[];
+        };
+        RoleCatalog: {
+            permissions: components["schemas"]["Permission"][];
+            builtin: components["schemas"]["BuiltinRole"][];
+            custom: components["schemas"]["CustomRole"][];
+        };
+        RoleAssignment: {
+            /** Format: uuid */
+            user_id: string;
+            /**
+             * Format: uuid
+             * @description null = org-wide
+             */
+            project_id?: string | null;
+            role: components["schemas"]["RoleRef"];
+            /** @enum {string} */
+            source: "manual" | "scim" | "sso";
+            /** Format: date-time */
+            created_at: string;
+        };
+        RoleAssignmentWrite: {
+            /** Format: uuid */
+            user_id: string;
+            /** Format: uuid */
+            project_id?: string | null;
+            role: components["schemas"]["RoleRef"];
+        };
+        RoleAssignmentList: {
+            items: components["schemas"]["RoleAssignment"][];
+        };
+        AuditSettings: {
+            /** @description 0 = keep forever */
+            retention_days: number;
+        };
+        RetentionPolicyWrite: {
+            enabled?: boolean;
+            run_days: number;
+            /** @description Never delete runs pinned as a suite baseline (default true) */
+            keep_baselines?: boolean;
+        };
+        RetentionPolicy: {
+            /** Format: uuid */
+            project_id: string;
+            enabled: boolean;
+            run_days: number;
+            keep_baselines: boolean;
+            /** Format: date-time */
+            last_applied_at?: string | null;
+            last_deleted: number;
+            total_deleted: number;
+            /** @description Runs the policy would delete now (capped at 1000) */
+            eligible_runs: number;
+        };
+        RetentionPolicyList: {
+            items: components["schemas"]["RetentionPolicy"][];
+        };
+        Branding: {
+            /** @description Replaces "airval" in the app chrome */
+            product_name?: string;
+            /** @description data: URL (PNG, JPEG, WebP or SVG, ≤ 128 KiB) or null */
+            logo?: string | null;
+            /**
+             * @description Curated accent ramp (default iris)
+             * @enum {string}
+             */
+            accent?: "iris" | "indigo" | "ocean" | "teal" | "plum";
+        };
     };
     responses: {
         /** @description Error */
@@ -3397,6 +4024,7 @@ export interface components {
         TriggerID: string;
         RunID: string;
         QueueID: string;
+        SSOProviderSlug: string;
     };
     requestBodies: never;
     headers: never;
@@ -3666,6 +4294,122 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Redirect into the app with a session */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listAuthProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthProviderList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getEdition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Edition"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    samlMetadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: components["parameters"]["SSOProviderSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SP metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/samlmetadata+xml": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    samlStart: {
+        parameters: {
+            query?: {
+                redirect?: string;
+            };
+            header?: never;
+            path: {
+                provider: components["parameters"]["SSOProviderSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the identity provider */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    samlACS: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: components["parameters"]["SSOProviderSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    SAMLResponse?: string;
+                    RelayState?: string;
+                };
+            };
+        };
         responses: {
             /** @description Redirect into the app with a session */
             302: {
@@ -4262,6 +5006,13 @@ export interface operations {
                 /** @description Opaque pagination cursor */
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["Limit"];
+                /** @description Case-insensitive substring of the actor */
+                actor?: string;
+                /** @description Action prefix, e.g. secret. or secret.create */
+                action?: string;
+                target?: string;
+                from?: string;
+                to?: string;
             };
             header?: never;
             path: {
@@ -4278,6 +5029,654 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditEntryList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listSSOProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOProviderList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createSSOProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SSOProviderCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOProvider"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getSSOProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOProvider"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteSSOProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateSSOProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SSOProviderUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSOProvider"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listSCIMTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SCIMTokenList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createSCIMToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SCIMTokenCreated"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteSCIMToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getSCIMSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SCIMSettings"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putSCIMSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SCIMSettings"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SCIMSettings"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleCatalog"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createCustomRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomRoleWrite"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRole"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteCustomRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateCustomRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomRoleWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomRole"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRoleAssignments: {
+        parameters: {
+            query?: {
+                user_id?: string;
+                project_id?: string;
+            };
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignmentList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    setRoleAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAssignmentWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAssignment"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteRoleAssignment: {
+        parameters: {
+            query: {
+                user_id: string;
+                project_id?: string;
+            };
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    exportAuditLog: {
+        parameters: {
+            query?: {
+                actor?: string;
+                action?: string;
+                target?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getAuditSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditSettings"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putAuditSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditSettings"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditSettings"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRetentionPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionPolicyList"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getRetentionPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: components["parameters"]["ProjectID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionPolicy"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putRetentionPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: components["parameters"]["ProjectID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetentionPolicyWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionPolicy"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteRetentionPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: components["parameters"]["ProjectID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed (runs are kept forever) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Branding"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    putBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org: components["parameters"]["Org"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Branding"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Branding"];
                 };
             };
             default: components["responses"]["Error"];
@@ -6513,6 +7912,322 @@ export interface operations {
                 };
             };
             default: components["responses"]["Error"];
+        };
+    };
+    scimListUsers: {
+        parameters: {
+            query?: {
+                filter?: string;
+                startIndex?: number;
+                count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ListResponse */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimCreateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/scim+json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimGetUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimReplaceUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/scim+json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description User */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimDeleteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scimPatchUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/scim+json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description User */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimListGroups: {
+        parameters: {
+            query?: {
+                filter?: string;
+                startIndex?: number;
+                count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ListResponse */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimCreateGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/scim+json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimGetGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Group */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimReplaceGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/scim+json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Group */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    scimDeleteGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    scimPatchGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/scim+json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Group */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
         };
     };
     fireWebhookTrigger: {

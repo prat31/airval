@@ -114,7 +114,7 @@ func toChannel(c store.NotificationChannel) gen.NotificationChannel {
 
 func toAudit(e store.AuditEntry) gen.AuditEntry {
 	return gen.AuditEntry{Id: e.ID, OrgId: e.OrgID, ActorId: e.ActorID, Actor: e.Actor, Action: e.Action, Target: e.Target,
-		Diff: rawPtr(e.Diff), At: e.At}
+		Diff: rawPtr(e.Diff), Ip: &e.IP, UserAgent: &e.UserAgent, RequestId: &e.RequestID, Status: &e.Status, At: e.At}
 }
 
 // ---- projects ----

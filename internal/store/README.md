@@ -41,6 +41,16 @@ both drivers), so there is one query per operation instead of two generated copi
    the table in `Run`) so both dialects are verified.
 5. Run `make test` and `make test-pg`.
 
+## Enterprise tables
+
+The enterprise edition (`ee/`, build tag `ee`) persists through `store.EnterpriseStore` (`models_enterprise.go`,
+`sqlstore/enterprise.go`, contract tests in `storetest/storetest_enterprise.go`). Its tables are prefixed `ee_` and
+live in the **core** migration set (`00003_enterprise.sql`) instead of a separate ee migration track: goose runs one
+ordered sequence per database, so a second track would need its own version table and ordering rules, and a
+deployment could not switch editions without migration drift. Core never reads these tables (the only exception:
+`DeleteMembership` also removes the member's `ee_role_assignments`). Audit-log request metadata (ip, user agent,
+request id, status) is core and used by both editions.
+
 ## Hot path
 
 `InsertResults` is used by workers' ingest batching: on Postgres it COPYs results and scores in one pgx

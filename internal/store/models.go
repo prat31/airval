@@ -504,5 +504,20 @@ type AuditEntry struct {
 	Action  string // e.g. "secret.create"
 	Target  string // e.g. "secret:<id>"
 	Diff    json.RawMessage
-	At      time.Time
+	// Request metadata (set by the audit middleware and core audit calls).
+	IP        string
+	UserAgent string
+	RequestID string
+	Status    int // HTTP status of the call (0 = not an API call)
+	At        time.Time
+}
+
+// AuditFilter narrows ListAudit. Empty fields match everything.
+type AuditFilter struct {
+	OrgID  uuid.UUID
+	Actor  string // case-insensitive substring of the actor
+	Action string // prefix, e.g. "secret." or "secret.create"
+	Target string // exact
+	From   *time.Time
+	To     *time.Time
 }

@@ -3,6 +3,7 @@ package sqlstore
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -249,25 +250,54 @@ func (s *Store) AppendAudit(ctx context.Context, e *store.AuditEntry) error {
 	if e.At.IsZero() {
 		e.At = now()
 	}
-	return s.exec(ctx, `INSERT INTO audit_log (id, org_id, actor_id, actor, action, target, diff, at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, e.ID, e.OrgID, e.ActorID, e.Actor, e.Action, e.Target, jsonArg(e.Diff, ""), e.At)
+	return s.exec(ctx, `INSERT INTO audit_log (id, org_id, actor_id, actor, action, target, diff, ip, user_agent, request_id, status, at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, e.ID, e.OrgID, e.ActorID, e.Actor, e.Action, e.Target, jsonArg(e.Diff, ""),
+		trunc(e.IP, 64), trunc(e.UserAgent, 512), trunc(e.RequestID, 128), e.Status, e.At)
 }
 
-func (s *Store) ListAudit(ctx context.Context, orgID uuid.UUID, p store.ListParams) (store.Page[store.AuditEntry], error) {
+func trunc(v string, n int) string {
+	if len(v) > n {
+		return v[:n]
+	}
+	return v
+}
+
+func (s *Store) ListAudit(ctx context.Context, f store.AuditFilter, p store.ListParams) (store.Page[store.AuditEntry], error) {
 	b := &qb{}
-	b.where("org_id = " + b.arg(orgID))
+	b.where("org_id = " + b.arg(f.OrgID))
+	if f.Actor != "" {
+		b.where("lower(actor) LIKE " + b.arg("%"+escapeLike(strings.ToLower(f.Actor))+"%") + ` ESCAPE '\'`)
+	}
+	if f.Action != "" {
+		b.where("action LIKE " + b.arg(escapeLike(f.Action)+"%") + ` ESCAPE '\'`)
+	}
+	if f.Target != "" {
+		b.where("target = " + b.arg(f.Target))
+	}
+	if f.From != nil {
+		b.where("at >= " + b.arg(f.From.UTC()))
+	}
+	if f.To != nil {
+		b.where("at < " + b.arg(f.To.UTC()))
+	}
 	tail, limit, err := b.paginate("id", p, true)
 	if err != nil {
 		return store.Page[store.AuditEntry]{}, err
 	}
-	items, err := collect(ctx, s, `SELECT id, org_id, actor_id, actor, action, target, diff, at FROM audit_log`+
-		b.whereSQL()+tail, b.args, func(r scanner) (store.AuditEntry, error) {
+	items, err := collect(ctx, s, `SELECT id, org_id, actor_id, actor, action, target, diff, ip, user_agent, request_id, status, at
+		FROM audit_log`+b.whereSQL()+tail, b.args, func(r scanner) (store.AuditEntry, error) {
 		var e store.AuditEntry
-		err := r.Scan(&e.ID, &e.OrgID, &e.ActorID, &e.Actor, &e.Action, &e.Target, rawJSON{&e.Diff}, &e.At)
+		err := r.Scan(&e.ID, &e.OrgID, &e.ActorID, &e.Actor, &e.Action, &e.Target, rawJSON{&e.Diff}, &e.IP, &e.UserAgent,
+			&e.RequestID, &e.Status, &e.At)
 		return e, err
 	})
 	if err != nil {
 		return store.Page[store.AuditEntry]{}, err
 	}
 	return finishPage(items, limit, func(e store.AuditEntry) uuid.UUID { return e.ID }), nil
+}
+
+// escapeLike escapes LIKE wildcards (used with ESCAPE '\').
+func escapeLike(v string) string {
+	return strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(v)
 }

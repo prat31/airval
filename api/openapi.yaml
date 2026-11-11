@@ -40,6 +40,8 @@ tags:
   - name: comparisons
   - name: review
   - name: hooks
+  - name: ee
+    description: Enterprise edition (build tag `ee`). Community builds answer 501.
 
 paths:
   # ---------------------------------------------------------------- system
@@ -159,6 +161,59 @@ paths:
         - { name: provider, in: path, required: true, schema: { type: string } }
         - { name: code, in: query, schema: { type: string } }
         - { name: state, in: query, schema: { type: string } }
+      responses:
+        "302": { description: Redirect into the app with a session }
+        default: { $ref: "#/components/responses/Error" }
+
+  /v1/auth/providers:
+    get:
+      tags: [auth]
+      operationId: listAuthProviders
+      summary: Single sign-on options for the sign-in page (empty in the community edition)
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AuthProviderList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/edition:
+    get:
+      tags: [system]
+      operationId: getEdition
+      summary: The running edition and its enabled enterprise features
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Edition" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/saml/{provider}/metadata:
+    get:
+      tags: [ee]
+      operationId: samlMetadata
+      summary: SAML service provider metadata XML (ee)
+      security: []
+      parameters: [{ $ref: "#/components/parameters/SSOProviderSlug" }]
+      responses:
+        "200": { description: SP metadata, content: { application/samlmetadata+xml: { schema: { type: string } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/saml/{provider}/start:
+    get:
+      tags: [ee]
+      operationId: samlStart
+      summary: Begin SAML SSO login (ee)
+      security: []
+      parameters:
+        - { $ref: "#/components/parameters/SSOProviderSlug" }
+        - { name: redirect, in: query, schema: { type: string } }
+      responses:
+        "302": { description: Redirect to the identity provider }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/saml/{provider}/acs:
+    post:
+      tags: [ee]
+      operationId: samlACS
+      summary: SAML assertion consumer service (HTTP-POST binding) (ee)
+      security: []
+      parameters: [{ $ref: "#/components/parameters/SSOProviderSlug" }]
+      requestBody:
+        content: { application/x-www-form-urlencoded: { schema: { type: object, properties: { SAMLResponse: { type: string }, RelayState: { type: string } } } } }
       responses:
         "302": { description: Redirect into the app with a session }
         default: { $ref: "#/components/responses/Error" }
@@ -376,10 +431,240 @@ paths:
     get:
       tags: [orgs]
       operationId: listAuditLog
-      summary: Audit log (admin; full coverage in ee)
-      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      summary: Audit log, newest first (admin; every mutating call is recorded in ee)
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: actor, in: query, description: Case-insensitive substring of the actor, schema: { type: string } }
+        - { name: action, in: query, description: "Action prefix, e.g. secret. or secret.create", schema: { type: string } }
+        - { name: target, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AuditEntryList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- enterprise (ee builds; core answers 501)
+  /v1/orgs/{org}/sso-providers:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: listSSOProviders
+      summary: SSO identity providers (admin, ee)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SSOProviderList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [ee]
+      operationId: createSSOProvider
+      summary: Add an OIDC or SAML identity provider (owner, ee)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SSOProviderCreate" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/SSOProvider" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/sso-providers/{id}:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [ee]
+      operationId: getSSOProvider
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SSOProvider" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [ee]
+      operationId: updateSSOProvider
+      summary: Update an identity provider (owner, ee). Omit client_secret to keep it.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SSOProviderUpdate" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SSOProvider" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [ee]
+      operationId: deleteSSOProvider
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/scim-tokens:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: listSCIMTokens
+      summary: SCIM bearer tokens (owner, ee)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SCIMTokenList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [ee]
+      operationId: createSCIMToken
+      summary: Create a SCIM bearer token (owner, ee). The plaintext token is returned once.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 100 } } } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/SCIMTokenCreated" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/scim-tokens/{id}:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    delete:
+      tags: [ee]
+      operationId: deleteSCIMToken
+      responses:
+        "204": { description: Revoked }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/scim-settings:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: getSCIMSettings
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SCIMSettings" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [ee]
+      operationId: putSCIMSettings
+      summary: Default role and SCIM group → role mapping (owner, ee)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SCIMSettings" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SCIMSettings" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/roles:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: listRoles
+      summary: Built-in and custom roles plus the permission catalog (ee)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RoleCatalog" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [ee]
+      operationId: createCustomRole
+      summary: Create a custom role (admin, ee)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CustomRoleWrite" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/CustomRole" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/roles/{id}:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      tags: [ee]
+      operationId: updateCustomRole
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CustomRoleWrite" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/CustomRole" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [ee]
+      operationId: deleteCustomRole
+      summary: Delete a custom role; its assignments are removed (admin, ee)
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/role-assignments:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: listRoleAssignments
+      summary: Org-wide and per-project role assignments (admin, ee)
+      parameters:
+        - { name: user_id, in: query, schema: { type: string, format: uuid } }
+        - { name: project_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RoleAssignmentList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [ee]
+      operationId: setRoleAssignment
+      summary: Assign a built-in or custom role to a member, org-wide or for one project (admin, ee)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RoleAssignmentWrite" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RoleAssignment" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [ee]
+      operationId: deleteRoleAssignment
+      parameters:
+        - { name: user_id, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: project_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Removed }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/audit-log/export:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: exportAuditLog
+      summary: Export the filtered audit log as CSV (admin, ee)
+      parameters:
+        - { name: actor, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: target, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200": { description: CSV, content: { text/csv: { schema: { type: string } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/audit-settings:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: getAuditSettings
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AuditSettings" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [ee]
+      operationId: putAuditSettings
+      summary: Audit log retention (owner, ee)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AuditSettings" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AuditSettings" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/retention-policies:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: listRetentionPolicies
+      summary: Per-project data retention policies (admin, ee)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RetentionPolicyList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/projects/{project}/retention-policy:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [ee]
+      operationId: getRetentionPolicy
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RetentionPolicy" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [ee]
+      operationId: putRetentionPolicy
+      summary: Delete this project's finished runs older than run_days (admin, ee). Applied hourly by the leader.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RetentionPolicyWrite" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RetentionPolicy" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [ee]
+      operationId: deleteRetentionPolicy
+      responses:
+        "204": { description: Removed (runs are kept forever) }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/branding:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [ee]
+      operationId: getBranding
+      summary: White-label branding (any member, ee)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Branding" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      tags: [ee]
+      operationId: putBranding
+      summary: Set product name, logo and accent (admin, ee)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Branding" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Branding" } } } }
         default: { $ref: "#/components/responses/Error" }
 
   # ---------------------------------------------------------------- projects
@@ -1254,6 +1539,102 @@ paths:
         "204": { description: Deleted }
         default: { $ref: "#/components/responses/Error" }
 
+  # ---------------------------------------------------------------- SCIM 2.0 (ee; bearer SCIM token, RFC 7643/7644)
+  /scim/v2/Users:
+    get:
+      tags: [ee]
+      operationId: scimListUsers
+      summary: List users; supports `filter=userName eq "..."` / `externalId eq "..."`, startIndex, count (ee)
+      security: [{ scimAuth: [] }]
+      parameters:
+        - { name: filter, in: query, schema: { type: string } }
+        - { name: startIndex, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: count, in: query, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200": { description: ListResponse, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    post:
+      tags: [ee]
+      operationId: scimCreateUser
+      security: [{ scimAuth: [] }]
+      requestBody: { content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+      responses:
+        "201": { description: Created, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+  /scim/v2/Users/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      tags: [ee]
+      operationId: scimGetUser
+      security: [{ scimAuth: [] }]
+      responses:
+        "200": { description: User, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    put:
+      tags: [ee]
+      operationId: scimReplaceUser
+      security: [{ scimAuth: [] }]
+      requestBody: { content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+      responses:
+        "200": { description: User, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    patch:
+      tags: [ee]
+      operationId: scimPatchUser
+      security: [{ scimAuth: [] }]
+      requestBody: { content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+      responses:
+        "200": { description: User, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    delete:
+      tags: [ee]
+      operationId: scimDeleteUser
+      summary: Deprovision (removes the membership and signs the user out)
+      security: [{ scimAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+  /scim/v2/Groups:
+    get:
+      tags: [ee]
+      operationId: scimListGroups
+      security: [{ scimAuth: [] }]
+      parameters:
+        - { name: filter, in: query, schema: { type: string } }
+        - { name: startIndex, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: count, in: query, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200": { description: ListResponse, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    post:
+      tags: [ee]
+      operationId: scimCreateGroup
+      security: [{ scimAuth: [] }]
+      requestBody: { content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+      responses:
+        "201": { description: Created, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+  /scim/v2/Groups/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      tags: [ee]
+      operationId: scimGetGroup
+      security: [{ scimAuth: [] }]
+      responses:
+        "200": { description: Group, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    put:
+      tags: [ee]
+      operationId: scimReplaceGroup
+      security: [{ scimAuth: [] }]
+      requestBody: { content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+      responses:
+        "200": { description: Group, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    patch:
+      tags: [ee]
+      operationId: scimPatchGroup
+      security: [{ scimAuth: [] }]
+      requestBody: { content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+      responses:
+        "200": { description: Group, content: { application/scim+json: { schema: { type: object, additionalProperties: true } } } }
+    delete:
+      tags: [ee]
+      operationId: scimDeleteGroup
+      security: [{ scimAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+
   # ---------------------------------------------------------------- inbound webhooks
   /hooks/{trigger}:
     parameters: [{ $ref: "#/components/parameters/TriggerID" }]
@@ -1278,6 +1659,7 @@ components:
   securitySchemes:
     cookieAuth: { type: apiKey, in: cookie, name: airval_session }
     bearerAuth: { type: http, scheme: bearer, description: "API key: airv_..." }
+    scimAuth: { type: http, scheme: bearer, description: "SCIM token (ee): airvscim_..." }
 
   parameters:
     Cursor: { name: cursor, in: query, description: Opaque pagination cursor, schema: { type: string } }
@@ -1293,6 +1675,7 @@ components:
     TriggerID: { name: trigger, in: path, required: true, schema: { type: string, format: uuid } }
     RunID: { name: run, in: path, required: true, schema: { type: string, format: uuid } }
     QueueID: { name: queue, in: path, required: true, schema: { type: string, format: uuid } }
+    SSOProviderSlug: { name: provider, in: path, required: true, schema: { type: string } }
 
   responses:
     Error:
@@ -1586,6 +1969,10 @@ components:
         action: { type: string }
         target: { type: string }
         diff: { $ref: "#/components/schemas/JSONValue" }
+        ip: { type: string }
+        user_agent: { type: string }
+        request_id: { type: string }
+        status: { type: integer, description: HTTP status of the call (0 = not an API call) }
         at: { type: string, format: date-time }
     AuditEntryList:
       type: object
@@ -3016,3 +3403,229 @@ components:
         label: { type: string }
         passed: { type: boolean, nullable: true }
         comment: { type: string }
+
+    # ------------------------------------------------------------ edition, login providers
+    Edition:
+      type: object
+      required: [edition, features]
+      properties:
+        edition: { type: string, enum: [community, enterprise] }
+        features:
+          type: array
+          description: Enabled enterprise features
+          items: { $ref: "#/components/schemas/EnterpriseFeature" }
+    EnterpriseFeature:
+      type: string
+      enum: [sso, saml, scim, custom_roles, audit_log, retention, branding]
+    AuthProvider:
+      type: object
+      required: [id, kind, name, start_url]
+      properties:
+        id: { type: string, description: Provider slug }
+        kind: { type: string, enum: [oidc, saml] }
+        name: { type: string }
+        start_url: { type: string, description: "Navigate here to sign in (append ?redirect=/path)" }
+    AuthProviderList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AuthProvider" } }
+
+    # ------------------------------------------------------------ enterprise: SSO
+    RoleRef:
+      type: string
+      description: A built-in role (owner, admin, editor, viewer) or `custom:<custom role id>`
+    RoleMappingRule:
+      type: object
+      required: [value, role]
+      properties:
+        value: { type: string, description: Claim / attribute / group value to match (exact, case-insensitive) }
+        role: { $ref: "#/components/schemas/RoleRef" }
+    SSOProviderConfig:
+      type: object
+      properties:
+        issuer: { type: string, description: "OIDC issuer URL (discovery at /.well-known/openid-configuration)" }
+        client_id: { type: string }
+        scopes: { type: array, items: { type: string }, description: "Defaults to openid email profile" }
+        idp_metadata_url: { type: string, description: SAML IdP metadata URL }
+        idp_metadata_xml: { type: string, description: SAML IdP metadata XML (instead of a URL) }
+        email_attribute: { type: string, description: "SAML attribute holding the email (default: NameID or the email attribute)" }
+        name_attribute: { type: string }
+        allowed_domains: { type: array, items: { type: string }, description: "Only these email domains may sign in (empty = any)" }
+        role_claim: { type: string, description: "Claim / attribute with groups or roles (e.g. groups)" }
+        role_mapping: { type: array, items: { $ref: "#/components/schemas/RoleMappingRule" } }
+        default_role: { $ref: "#/components/schemas/Role" }
+        jit_provisioning: { type: boolean, description: Create users and memberships on first sign-in }
+        sync_roles: { type: boolean, description: "Re-apply role mapping on every sign-in (owners are never changed)" }
+    SSOProvider:
+      type: object
+      required: [id, org_id, slug, kind, name, enabled, config, has_client_secret, redirect_uri, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        slug: { type: string }
+        kind: { type: string, enum: [oidc, saml] }
+        name: { type: string }
+        enabled: { type: boolean }
+        config: { $ref: "#/components/schemas/SSOProviderConfig" }
+        has_client_secret: { type: boolean }
+        redirect_uri: { type: string, description: OIDC redirect URI or SAML ACS URL to register with the IdP }
+        metadata_url: { type: string, description: SAML SP metadata URL }
+        entity_id: { type: string, description: SAML SP entity id }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SSOProviderCreate:
+      type: object
+      required: [kind, name, config]
+      properties:
+        kind: { type: string, enum: [oidc, saml] }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,62}$" }
+        enabled: { type: boolean }
+        config: { $ref: "#/components/schemas/SSOProviderConfig" }
+        client_secret: { type: string, description: OIDC client secret (write-only, encrypted at rest) }
+    SSOProviderUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        enabled: { type: boolean }
+        config: { $ref: "#/components/schemas/SSOProviderConfig" }
+        client_secret: { type: string, description: Replaces the client secret; omit to keep it }
+    SSOProviderList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/SSOProvider" } }
+
+    # ------------------------------------------------------------ enterprise: SCIM
+    SCIMToken:
+      type: object
+      required: [id, name, prefix, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        prefix: { type: string }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    SCIMTokenCreated:
+      allOf:
+        - { $ref: "#/components/schemas/SCIMToken" }
+        - type: object
+          required: [token, base_url]
+          properties:
+            token: { type: string, description: Shown once }
+            base_url: { type: string, description: SCIM base URL to configure in the IdP }
+    SCIMTokenList:
+      type: object
+      required: [items, base_url]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/SCIMToken" } }
+        base_url: { type: string }
+    SCIMSettings:
+      type: object
+      required: [default_role, group_roles]
+      properties:
+        default_role: { $ref: "#/components/schemas/Role" }
+        group_roles:
+          type: array
+          description: SCIM group display name → role. The highest built-in role across a user's groups wins.
+          items: { $ref: "#/components/schemas/RoleMappingRule" }
+
+    # ------------------------------------------------------------ enterprise: roles
+    Permission:
+      type: object
+      required: [id, resource, action, description]
+      properties:
+        id: { type: string, description: "resource:action" }
+        resource: { type: string }
+        action: { type: string }
+        description: { type: string }
+    BuiltinRole:
+      type: object
+      required: [role, permissions]
+      properties:
+        role: { $ref: "#/components/schemas/Role" }
+        permissions: { type: array, items: { type: string } }
+    CustomRole:
+      type: object
+      required: [id, key, name, description, permissions, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        permissions: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CustomRoleWrite:
+      type: object
+      required: [name, permissions]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        description: { type: string, maxLength: 500 }
+        permissions: { type: array, items: { type: string } }
+    RoleCatalog:
+      type: object
+      required: [permissions, builtin, custom]
+      properties:
+        permissions: { type: array, items: { $ref: "#/components/schemas/Permission" } }
+        builtin: { type: array, items: { $ref: "#/components/schemas/BuiltinRole" } }
+        custom: { type: array, items: { $ref: "#/components/schemas/CustomRole" } }
+    RoleAssignment:
+      type: object
+      required: [user_id, role, source, created_at]
+      properties:
+        user_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid, nullable: true, description: null = org-wide }
+        role: { $ref: "#/components/schemas/RoleRef" }
+        source: { type: string, enum: [manual, scim, sso] }
+        created_at: { type: string, format: date-time }
+    RoleAssignmentWrite:
+      type: object
+      required: [user_id, role]
+      properties:
+        user_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid, nullable: true }
+        role: { $ref: "#/components/schemas/RoleRef" }
+    RoleAssignmentList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/RoleAssignment" } }
+
+    # ------------------------------------------------------------ enterprise: audit, retention, branding
+    AuditSettings:
+      type: object
+      required: [retention_days]
+      properties:
+        retention_days: { type: integer, minimum: 0, maximum: 3650, description: 0 = keep forever }
+    RetentionPolicyWrite:
+      type: object
+      required: [run_days]
+      properties:
+        enabled: { type: boolean }
+        run_days: { type: integer, minimum: 1, maximum: 3650 }
+        keep_baselines: { type: boolean, description: Never delete runs pinned as a suite baseline (default true) }
+    RetentionPolicy:
+      type: object
+      required: [project_id, enabled, run_days, keep_baselines, last_deleted, total_deleted, eligible_runs]
+      properties:
+        project_id: { type: string, format: uuid }
+        enabled: { type: boolean }
+        run_days: { type: integer }
+        keep_baselines: { type: boolean }
+        last_applied_at: { type: string, format: date-time, nullable: true }
+        last_deleted: { type: integer }
+        total_deleted: { type: integer }
+        eligible_runs: { type: integer, description: "Runs the policy would delete now (capped at 1000)" }
+    RetentionPolicyList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/RetentionPolicy" } }
+    Branding:
+      type: object
+      properties:
+        product_name: { type: string, maxLength: 40, description: Replaces "airval" in the app chrome }
+        logo: { type: string, nullable: true, description: "data: URL (PNG, JPEG, WebP or SVG, ≤ 128 KiB) or null" }
+        accent: { type: string, enum: [iris, indigo, ocean, teal, plum], description: Curated accent ramp (default iris) }

@@ -102,7 +102,13 @@ func (s *Store) ListMembers(ctx context.Context, orgID uuid.UUID, p store.ListPa
 }
 
 func (s *Store) DeleteMembership(ctx context.Context, orgID, userID uuid.UUID) error {
-	return s.execAffect(ctx, `DELETE FROM memberships WHERE org_id = $1 AND user_id = $2`, orgID, userID)
+	// Enterprise role assignments belong to the membership: a re-added member starts from their core role.
+	return s.withTx(ctx, func(tx *Store) error {
+		if err := tx.exec(ctx, `DELETE FROM ee_role_assignments WHERE org_id = $1 AND user_id = $2`, orgID, userID); err != nil {
+			return err
+		}
+		return tx.execAffect(ctx, `DELETE FROM memberships WHERE org_id = $1 AND user_id = $2`, orgID, userID)
+	})
 }
 
 func (s *Store) CountOwners(ctx context.Context, orgID uuid.UUID) (int, error) {
