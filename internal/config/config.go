@@ -27,6 +27,7 @@ type Config struct {
 	Auth      Auth      `koanf:"auth" yaml:"auth"`
 	Bootstrap Bootstrap `koanf:"bootstrap" yaml:"bootstrap"`
 	Workers   Workers   `koanf:"workers" yaml:"workers"`
+	Worker    Worker    `koanf:"worker" yaml:"worker"`
 	Telemetry Telemetry `koanf:"telemetry" yaml:"telemetry"`
 	Security  Security  `koanf:"security" yaml:"security"`
 }
@@ -104,6 +105,12 @@ type Telemetry struct {
 	Metrics      bool    `koanf:"metrics" yaml:"metrics"`
 }
 
+// Worker configures the `airval worker` process's operational HTTP listener.
+type Worker struct {
+	// Listen serves /healthz, /readyz (DB + NATS) and /metrics (default ":8081"; empty disables).
+	Listen string `koanf:"listen" yaml:"listen"`
+}
+
 // Security holds outbound-request guards for http targets and webhooks.
 type Security struct {
 	// AllowCIDRs / DenyCIDRs are comma-separated. Metadata IPs are always denied unless allowed explicitly.
@@ -145,6 +152,7 @@ func defaults(mode Mode) map[string]any {
 		"workers.judge_concurrency": 32,
 		"workers.shutdown_timeout":  "30s",
 		"workers.embedded":          false,
+		"worker.listen":             ":8081",
 		"telemetry.log_level":       "info",
 		"telemetry.log_format":      "json",
 		"telemetry.service_name":    "airval",

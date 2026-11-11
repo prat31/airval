@@ -21,10 +21,11 @@ import (
 	"github.com/airval/airval/internal/ext"
 	"github.com/airval/airval/internal/queue"
 	"github.com/airval/airval/internal/rbac"
-	"github.com/airval/airval/internal/runner"
+	"github.com/airval/airval/internal/notify"
 	"github.com/airval/airval/internal/secrets"
 	"github.com/airval/airval/internal/store"
 	"github.com/airval/airval/internal/store/sqlstore"
+	"github.com/airval/airval/internal/targets"
 	"github.com/airval/airval/internal/telemetry"
 	"github.com/airval/airval/internal/webui"
 )
@@ -49,6 +50,8 @@ type App struct {
 	API     *api.Server
 	Build   BuildInfo
 
+	clients *targets.ClientFactory
+	notif   *notify.Notifier
 	closers []func()
 }
 
@@ -124,7 +127,7 @@ func New(ctx context.Context, mode config.Mode, c *config.Config, bi BuildInfo) 
 		}
 		a.API = api.New(api.Deps{Store: a.Store, Queue: a.Queue, Keyring: a.Keyring, Auth: a.Auth, Authz: a.Authz,
 			Config: c, Logger: a.Logger, Metrics: a.Metrics, Version: bi.Version, Commit: bi.Commit, UI: ui,
-			Edition: ext.Edition()})
+			Edition: ext.Edition(), SendNotification: a.channelSender()})
 		if err := a.initExtensions(ctx); err != nil {
 			a.Close()
 			return nil, err
@@ -168,12 +171,14 @@ func (a *App) Run(ctx context.Context) error {
 			return srv.Shutdown(sctx)
 		})
 		g.Go(func() error { a.housekeeping(ctx); return nil })
+		g.Go(func() error { a.runScheduler(ctx); return nil })
 	}
 	if a.Mode == config.ModeWorker || a.Config.Workers.Embedded {
-		host, _ := os.Hostname()
-		w := runner.New(runner.Deps{Store: a.Store, Queue: a.Queue, Keyring: a.Keyring, Config: a.Config.Workers,
-			Logger: a.Logger, Metrics: a.Metrics, WorkerID: fmt.Sprintf("%s-%d", host, os.Getpid())})
+		w := a.NewWorker()
 		g.Go(func() error { return w.Run(ctx) })
+	}
+	if a.Mode == config.ModeWorker && a.Config.Worker.Listen != "" {
+		g.Go(func() error { return a.serveWorkerOps(ctx, a.Config.Worker.Listen) })
 	}
 	return g.Wait()
 }

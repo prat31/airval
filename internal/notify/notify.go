@@ -422,13 +422,6 @@ func truncate(s string, n int) string {
 // ---- email ----
 
 func (n *Notifier) email(ctx context.Context, cfg ChannelConfig, ev RunEvent) error {
-	if len(cfg.Recipients) == 0 {
-		return errors.New("recipients are required")
-	}
-	from := cfg.From
-	if from == "" {
-		from = "airval@localhost"
-	}
 	subject := title(ev)
 	if cfg.SubjectPrefix != "" {
 		subject = cfg.SubjectPrefix + " " + subject
@@ -460,8 +453,19 @@ func (n *Notifier) email(ctx context.Context, cfg ChannelConfig, ev RunEvent) er
 	if ev.URL != "" {
 		fmt.Fprintf(&b, "\r\nOpen the run: %s\r\n", ev.URL)
 	}
+	return n.mail(ctx, cfg, subject, b.String())
+}
+
+func (n *Notifier) mail(ctx context.Context, cfg ChannelConfig, subject, body string) error {
+	if len(cfg.Recipients) == 0 {
+		return errors.New("recipients are required")
+	}
+	from := cfg.From
+	if from == "" {
+		from = "airval@localhost"
+	}
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nDate: %s\r\n\r\n%s",
-		from, strings.Join(cfg.Recipients, ", "), mimeHeader(subject), time.Now().UTC().Format(time.RFC1123Z), b.String())
+		from, strings.Join(cfg.Recipients, ", "), mimeHeader(subject), time.Now().UTC().Format(time.RFC1123Z), body)
 	if n.SendMail != nil {
 		return n.SendMail(ctx, cfg, from, cfg.Recipients, []byte(msg))
 	}
