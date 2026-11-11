@@ -57,7 +57,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Does the chart need to create a Secret? */}}
 {{- define "airval.createSecret" -}}
-{{- if or (not .Values.secrets.existingSecret) (and (not .Values.postgresql.cnpg.enabled) (not .Values.postgresql.external.existingSecret) .Values.postgresql.external.url) (and (not .Values.secrets.existingSecret) .Values.bootstrap.adminPassword) -}}
+{{- if or (not .Values.secrets.existingSecret) .Values.postgresql.dev.enabled (and (not .Values.postgresql.cnpg.enabled) (not .Values.postgresql.external.existingSecret) .Values.postgresql.external.url) (and (not .Values.secrets.existingSecret) .Values.bootstrap.adminPassword) -}}
 true
 {{- end }}
 {{- end }}
@@ -76,11 +76,14 @@ true
 {{- if and (not .Values.nats.enabled) (not .Values.nats.external.url) }}
 {{- fail "set nats.external.url (nats://host:4222) or enable the bundled nats subchart (nats.enabled=true)" }}
 {{- end }}
-{{- if and .Values.postgresql.cnpg.enabled (or .Values.postgresql.external.url .Values.postgresql.external.existingSecret) }}
-{{- fail "postgresql.cnpg.enabled and postgresql.external.* are mutually exclusive" }}
+{{- if and .Values.postgresql.cnpg.enabled .Values.postgresql.dev.enabled }}
+{{- fail "postgresql.cnpg.enabled and postgresql.dev.enabled are mutually exclusive" }}
 {{- end }}
-{{- if not (or .Values.postgresql.cnpg.enabled .Values.postgresql.external.url .Values.postgresql.external.existingSecret) }}
-{{- fail "set postgresql.external.url (or postgresql.external.existingSecret), or enable postgresql.cnpg.enabled for an evaluation database" }}
+{{- if and (or .Values.postgresql.cnpg.enabled .Values.postgresql.dev.enabled) (or .Values.postgresql.external.url .Values.postgresql.external.existingSecret) }}
+{{- fail "postgresql.cnpg.enabled / postgresql.dev.enabled and postgresql.external.* are mutually exclusive" }}
+{{- end }}
+{{- if not (or .Values.postgresql.cnpg.enabled .Values.postgresql.dev.enabled .Values.postgresql.external.url .Values.postgresql.external.existingSecret) }}
+{{- fail "set postgresql.external.url (or postgresql.external.existingSecret), or enable postgresql.cnpg.enabled / postgresql.dev.enabled for an evaluation database" }}
 {{- end }}
 {{- end }}
 
@@ -106,6 +109,16 @@ true
 {{/* Name of the CloudNativePG cluster. */}}
 {{- define "airval.cnpgName" -}}
 {{- printf "%s-pg" (include "airval.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/* Name of the dev-only bundled Postgres. */}}
+{{- define "airval.devPgName" -}}
+{{- printf "%s-postgres" (include "airval.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/* True when the database is created by this release, so it cannot exist yet for the pre-install migration Job. */}}
+{{- define "airval.bundledDB" -}}
+{{- if or .Values.postgresql.cnpg.enabled .Values.postgresql.dev.enabled -}}true{{- end }}
 {{- end }}
 
 {{/* AIRVAL_DATABASE_URL env entry. */}}
@@ -158,8 +171,8 @@ Call with a dict: (dict "ctx" $ "role" "server|worker|migrate")
 {{- end }}
 {{- if ne $role "migrate" }}
 - name: AIRVAL_DATABASE_AUTO_MIGRATE
-  # The migration Job owns schema changes; with the evaluation CNPG database the server migrates itself on first start.
-  value: {{ and (eq $role "server") $.Values.postgresql.cnpg.enabled | quote }}
+  # The migration Job owns schema changes; with an evaluation database (CNPG or dev) the server migrates itself on first start.
+  value: {{ if and (eq $role "server") (include "airval.bundledDB" $) }}"true"{{ else }}"false"{{ end }}
 - name: AIRVAL_SERVER_ADDR
   value: ":8080"
 - name: AIRVAL_SERVER_BASE_URL

@@ -1,0 +1,4 @@
+# Evaluation install: bundled dev-only Postgres (no operator needed). Used by kind smoke tests.
+postgresql:
+  dev:
+    enabled: true

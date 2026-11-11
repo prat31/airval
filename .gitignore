@@ -10,3 +10,4 @@ web/dist/*
 coverage.out
 
 .claude/worktrees/
+deploy/helm/airval/charts/*.tgz

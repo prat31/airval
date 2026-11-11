@@ -7,9 +7,9 @@ metadata:
     {{- include "airval.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrate
   annotations:
-    # With the bundled CloudNativePG database the cluster only exists after install, so the server migrates itself
-    # on first start and the Job runs on upgrades only.
-    "helm.sh/hook": {{ ternary "pre-upgrade" "pre-install,pre-upgrade" .Values.postgresql.cnpg.enabled }}
+    # With a bundled evaluation database (CloudNativePG or postgresql.dev) it only exists after install, so the server
+    # migrates itself on first start and the Job runs on upgrades only.
+    "helm.sh/hook": {{ ternary "pre-upgrade" "pre-install,pre-upgrade" (not (empty (include "airval.bundledDB" .))) }}
     "helm.sh/hook-weight": "0"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
