@@ -2154,7 +2154,7 @@ components:
       type: object
       additionalProperties: true
       x-go-type: json.RawMessage
-      description: Kind-specific options. Only the fields relevant to the kind are used.
+      description: Kind-specific options, validated strictly per kind; the exact fields and types come from GET /v1/evaluators/catalog (`config_schema`). Judges take flat `provider`, `model`, `secret`. The properties below are illustrative.
       properties:
         field: { type: string, description: "What to score: output (default), output_json, context, transcript, or a JSONPath into the output" }
         value: { $ref: "#/components/schemas/JSONValue" }

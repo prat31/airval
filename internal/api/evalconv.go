@@ -52,9 +52,8 @@ func evalFromData(id string, d store.ExampleData) evalcore.Example {
 // importer's id is kept only when it is a UUID).
 func fromEvalExample(ex evalcore.Example, extraTags []string) store.ExampleUpsert {
 	u := store.ExampleUpsert{}
-	if id, err := uuid.Parse(ex.ID); err == nil {
-		u.ID = &id
-	}
+	// Imported rows always become new examples: ids from a source (e.g. an export of another
+	// dataset) are globally unique keys and must not be reused.
 	u.Input = mustJSON(nonNilMap(ex.Input))
 	if ex.Expected != nil {
 		u.Expected = mustJSON(ex.Expected)
