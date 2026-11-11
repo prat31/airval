@@ -1,0 +1,16 @@
+package: gen
+output: api.gen.go
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  skip-prune: true
+  exclude-operation-ids:
+    - getHealthz
+    - getReadyz
+    - getMetrics
+    - fireWebhookTrigger
+    - oidcStart
+    - oidcCallback

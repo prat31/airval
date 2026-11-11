@@ -1,0 +1,2759 @@
+openapi: 3.0.3
+info:
+  title: airval API
+  version: 1.0.0
+  description: |
+    The airval public API. The web UI, the `airval run` CLI and CI integrations use only this API.
+
+    **Authentication.** Browser sessions use the `airval_session` cookie; every mutating request made with a
+    session must send the CSRF token (from `GET /v1/auth/me` or the `airval_csrf` cookie) in `X-CSRF-Token`.
+    Programmatic clients send an API key as `Authorization: Bearer airv_...` (no CSRF needed).
+
+    **Pagination.** List endpoints are cursor-based: pass `cursor` (from `next_cursor`) and `limit` (1–1000, default 50).
+    `next_cursor` is null on the last page.
+
+    **Errors.** Non-2xx responses carry an `Error` body (`code`, `message`, optional `details`).
+
+    **Roles.** owner > admin > editor > viewer. Viewers read; editors create/edit/run; admins manage members, keys,
+    secrets and notification channels; owners can delete the organization.
+
+    Endpoints marked *(ee)* are only functional in enterprise builds (`-tags ee`); core returns 501.
+    Operational endpoints `/healthz`, `/readyz` and `/metrics` (Prometheus text) are served outside `/v1`.
+  license:
+    name: Apache-2.0
+servers:
+  - url: /
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+tags:
+  - name: system
+  - name: auth
+  - name: orgs
+  - name: projects
+  - name: targets
+  - name: datasets
+  - name: evaluators
+  - name: suites
+  - name: runs
+  - name: comparisons
+  - name: review
+  - name: hooks
+
+paths:
+  # ---------------------------------------------------------------- system
+  /healthz:
+    get:
+      tags: [system]
+      operationId: getHealthz
+      summary: Liveness probe
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+  /readyz:
+    get:
+      tags: [system]
+      operationId: getReadyz
+      summary: Readiness probe (database + NATS)
+      security: []
+      responses:
+        "200": { description: Ready, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+        "503": { description: Not ready, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+  /metrics:
+    get:
+      tags: [system]
+      operationId: getMetrics
+      summary: Prometheus metrics
+      security: []
+      responses:
+        "200": { description: Prometheus text exposition, content: { text/plain: { schema: { type: string } } } }
+  /v1/meta:
+    get:
+      tags: [system]
+      operationId: getMeta
+      summary: Server version, edition and enabled features
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Meta" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- setup & auth
+  /v1/setup:
+    get:
+      tags: [auth]
+      operationId: getSetupStatus
+      summary: Whether first-run setup is still needed
+      security: []
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SetupStatus" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [auth]
+      operationId: completeSetup
+      summary: Create the first owner and organization (only when no users exist); logs the owner in
+      security: []
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SetupRequest" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Me" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Log in with email and password (sets the session cookie)
+      security: []
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LoginRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Me" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the current session
+      responses:
+        "204": { description: Logged out }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      summary: The authenticated principal, its organizations and the CSRF token
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Me" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [auth]
+      operationId: updateMe
+      summary: Update the current user's profile or password
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/UpdateMeRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Me" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/oidc/{provider}/start:
+    get:
+      tags: [auth]
+      operationId: oidcStart
+      summary: Begin OIDC SSO login (ee)
+      security: []
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string } }
+        - { name: redirect, in: query, schema: { type: string } }
+      responses:
+        "302": { description: Redirect to the identity provider }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/auth/oidc/{provider}/callback:
+    get:
+      tags: [auth]
+      operationId: oidcCallback
+      summary: OIDC SSO callback (ee)
+      security: []
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string } }
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+      responses:
+        "302": { description: Redirect into the app with a session }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- organizations
+  /v1/orgs:
+    get:
+      tags: [orgs]
+      operationId: listOrgs
+      summary: Organizations the caller belongs to
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/OrganizationList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [orgs]
+      operationId: createOrg
+      summary: Create an organization (caller becomes owner)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/OrganizationCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Organization" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [orgs]
+      operationId: getOrg
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Organization" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [orgs]
+      operationId: updateOrg
+      summary: Rename an organization (admin)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/OrganizationUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Organization" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [orgs]
+      operationId: deleteOrg
+      summary: Delete an organization and everything in it (owner)
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/members:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [orgs]
+      operationId: listMembers
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MemberList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [orgs]
+      operationId: addMember
+      summary: Add a member by email (admin). Creates the user when `password` is given and the email is new.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/MemberCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Member" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/members/{user}:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { $ref: "#/components/parameters/UserID" }]
+    patch:
+      tags: [orgs]
+      operationId: updateMember
+      summary: Change a member's role (admin; only owners grant owner)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/MemberUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Member" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [orgs]
+      operationId: removeMember
+      summary: Remove a member (admin; members may remove themselves). The last owner cannot be removed.
+      responses:
+        "204": { description: Removed }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/api-keys:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [orgs]
+      operationId: listApiKeys
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ApiKeyList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [orgs]
+      operationId: createApiKey
+      summary: Create an API key (admin). The plaintext key is returned once.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ApiKeyCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/ApiKeyCreated" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/api-keys/{key}:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { name: key, in: path, required: true, schema: { type: string, format: uuid } }]
+    delete:
+      tags: [orgs]
+      operationId: deleteApiKey
+      summary: Revoke an API key (admin)
+      responses:
+        "204": { description: Revoked }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/secrets:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [orgs]
+      operationId: listSecrets
+      summary: List secrets (metadata only; values are never returned)
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: project_id, in: query, description: "Only this project's secrets (omit for org-level secrets)", schema: { type: string, format: uuid } }
+        - { name: all, in: query, description: "Org-level and every project's secrets", schema: { type: boolean } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SecretList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [orgs]
+      operationId: createSecret
+      summary: Create a secret (admin). The value is write-only.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SecretCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Secret" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/secrets/{secret}:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { name: secret, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [orgs]
+      operationId: getSecret
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Secret" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [orgs]
+      operationId: updateSecret
+      summary: Replace a secret's value and/or description (admin)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SecretUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Secret" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [orgs]
+      operationId: deleteSecret
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/notification-channels:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [orgs]
+      operationId: listNotificationChannels
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NotificationChannelList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [orgs]
+      operationId: createNotificationChannel
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NotificationChannelCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/NotificationChannel" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/notification-channels/{channel}:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { name: channel, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [orgs]
+      operationId: getNotificationChannel
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NotificationChannel" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [orgs]
+      operationId: updateNotificationChannel
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NotificationChannelUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NotificationChannel" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [orgs]
+      operationId: deleteNotificationChannel
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/notification-channels/{channel}:test:
+    parameters: [{ $ref: "#/components/parameters/Org" }, { name: channel, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [orgs]
+      operationId: testNotificationChannel
+      summary: Send a test notification
+      responses:
+        "204": { description: Sent }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/orgs/{org}/audit-log:
+    parameters: [{ $ref: "#/components/parameters/Org" }]
+    get:
+      tags: [orgs]
+      operationId: listAuditLog
+      summary: Audit log (admin; full coverage in ee)
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AuditEntryList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- projects
+  /v1/projects:
+    get:
+      tags: [projects]
+      operationId: listProjects
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: org_id, in: query, description: "Restrict to one organization (default: all of the caller's)", schema: { type: string, format: uuid } }
+        - { name: slug, in: query, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [projects]
+      operationId: createProject
+      summary: Create a project (editor)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ProjectCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Project" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/projects/{project}:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [projects]
+      operationId: getProject
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Project" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [projects]
+      operationId: updateProject
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ProjectUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Project" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [projects]
+      operationId: deleteProject
+      summary: Delete a project and everything in it (admin)
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/projects/{project}/trends:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [runs]
+      operationId: getTrends
+      summary: Time series of run aggregates (pass rate, evaluator means, latency, cost)
+      parameters:
+        - { name: suite_id, in: query, schema: { type: string, format: uuid } }
+        - { name: target_id, in: query, schema: { type: string, format: uuid } }
+        - { name: evaluator_id, in: query, schema: { type: string, format: uuid } }
+        - { name: metric, in: query, schema: { $ref: "#/components/schemas/TrendMetric" } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: bucket, in: query, schema: { type: string, enum: [run, hour, day, week], default: run } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Trend" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- targets
+  /v1/projects/{project}/targets:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [targets]
+      operationId: listTargets
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TargetList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [targets]
+      operationId: createTarget
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TargetCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Target" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/targets/{target}:
+    parameters: [{ $ref: "#/components/parameters/TargetID" }]
+    get:
+      tags: [targets]
+      operationId: getTarget
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Target" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [targets]
+      operationId: updateTarget
+      summary: Update a target. A changed `config` creates a new immutable version.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TargetUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Target" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [targets]
+      operationId: deleteTarget
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/targets/{target}/versions:
+    parameters: [{ $ref: "#/components/parameters/TargetID" }]
+    get:
+      tags: [targets]
+      operationId: listTargetVersions
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TargetVersionList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/targets/{target}/versions/{version}:
+    parameters: [{ $ref: "#/components/parameters/TargetID" }, { name: version, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [targets]
+      operationId: getTargetVersion
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TargetVersion" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/targets/{target}:test:
+    parameters: [{ $ref: "#/components/parameters/TargetID" }]
+    post:
+      tags: [targets]
+      operationId: testTarget
+      summary: Send one example to the target ("Test connection") and show raw request/response with mapping applied
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TargetTestRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TargetTestResult" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/projects/{project}/targets:test:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    post:
+      tags: [targets]
+      operationId: testTargetDraft
+      summary: Test an unsaved target configuration (target form playground)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TargetDraftTestRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TargetTestResult" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- datasets
+  /v1/projects/{project}/datasets:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [datasets]
+      operationId: listDatasets
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DatasetList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [datasets]
+      operationId: createDataset
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DatasetCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Dataset" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }]
+    get:
+      tags: [datasets]
+      operationId: getDataset
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Dataset" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [datasets]
+      operationId: updateDataset
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DatasetUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Dataset" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [datasets]
+      operationId: deleteDataset
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}/examples:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }]
+    get:
+      tags: [datasets]
+      operationId: listExamples
+      summary: List draft examples, or a published version's examples with `version`
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: version, in: query, description: Version number (omit for the draft), schema: { type: integer, minimum: 1 } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: q, in: query, description: Substring search over input, expected and metadata, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ExampleList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [datasets]
+      operationId: upsertExamples
+      summary: Bulk upsert examples into the draft (items with a known `id` get a new revision only if changed)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ExampleUpsertRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ExampleUpsertResponse" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}/examples:delete:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }]
+    post:
+      tags: [datasets]
+      operationId: deleteExamples
+      summary: Bulk delete examples from the draft (published versions are unaffected)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/IDList" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/CountResponse" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}/examples/{example}:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }, { name: example, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [datasets]
+      operationId: getExample
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Example" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}:import:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }]
+    post:
+      tags: [datasets]
+      operationId: importDataset
+      summary: Import examples from CSV/JSONL/JSON/Parquet (upload or URL) or a public Hugging Face dataset, with column mapping. `preview=true` returns parsed rows without writing.
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/DatasetImportRequest" } }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                options: { type: string, description: "JSON-encoded DatasetImportRequest (without source.url/hf)" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DatasetImportResult" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}:from-results:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }]
+    post:
+      tags: [datasets]
+      operationId: addExamplesFromResults
+      summary: Promote run results into the dataset draft ("Add to dataset")
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/FromResultsRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ExampleUpsertResponse" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}/versions:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }]
+    get:
+      tags: [datasets]
+      operationId: listDatasetVersions
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DatasetVersionList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [datasets]
+      operationId: publishDatasetVersion
+      summary: Freeze the draft into a new immutable version
+      requestBody:
+        content: { application/json: { schema: { $ref: "#/components/schemas/PublishVersionRequest" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/DatasetVersion" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}/versions/{number}:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }, { $ref: "#/components/parameters/VersionNumber" }]
+    get:
+      tags: [datasets]
+      operationId: getDatasetVersion
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DatasetVersion" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/datasets/{dataset}/versions/{number}/export:
+    parameters: [{ $ref: "#/components/parameters/DatasetID" }, { $ref: "#/components/parameters/VersionNumber" }]
+    get:
+      tags: [datasets]
+      operationId: exportDatasetVersion
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [jsonl, csv], default: jsonl } }
+      responses:
+        "200":
+          description: The version's examples
+          content:
+            application/x-ndjson: { schema: { type: string } }
+            text/csv: { schema: { type: string } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- evaluators
+  /v1/projects/{project}/evaluators:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [evaluators]
+      operationId: listEvaluators
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/EvaluatorList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [evaluators]
+      operationId: createEvaluator
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/EvaluatorCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Evaluator" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/evaluators/{evaluator}:
+    parameters: [{ $ref: "#/components/parameters/EvaluatorID" }]
+    get:
+      tags: [evaluators]
+      operationId: getEvaluator
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Evaluator" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [evaluators]
+      operationId: updateEvaluator
+      summary: Update an evaluator; changing kind or config bumps `version`
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/EvaluatorUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Evaluator" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [evaluators]
+      operationId: deleteEvaluator
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/evaluators/{evaluator}/agreement:
+    parameters: [{ $ref: "#/components/parameters/EvaluatorID" }]
+    get:
+      tags: [evaluators]
+      operationId: getEvaluatorAgreement
+      summary: Agreement between this evaluator and human annotations (Cohen's kappa)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/EvaluatorAgreement" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/evaluators:preview:
+    post:
+      tags: [evaluators]
+      operationId: previewEvaluator
+      summary: Score one output with an evaluator definition (editor live preview)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/EvaluatorPreviewRequest" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Score" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- suites, gates, triggers
+  /v1/projects/{project}/suites:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [suites]
+      operationId: listSuites
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SuiteList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [suites]
+      operationId: createSuite
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SuiteCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Suite" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/projects/{project}/suites/by-slug/{slug}:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }, { name: slug, in: path, required: true, schema: { type: string } }]
+    get:
+      tags: [suites]
+      operationId: getSuiteBySlug
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Suite" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/suites/{suite}:
+    parameters: [{ $ref: "#/components/parameters/SuiteID" }]
+    get:
+      tags: [suites]
+      operationId: getSuite
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Suite" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [suites]
+      operationId: updateSuite
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SuiteUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Suite" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [suites]
+      operationId: deleteSuite
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/suites/{suite}/gates:
+    parameters: [{ $ref: "#/components/parameters/SuiteID" }]
+    get:
+      tags: [suites]
+      operationId: listGates
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/GateList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [suites]
+      operationId: createGate
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/GateCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Gate" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/suites/{suite}/gates/{gate}:
+    parameters: [{ $ref: "#/components/parameters/SuiteID" }, { name: gate, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      tags: [suites]
+      operationId: updateGate
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/GateUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Gate" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [suites]
+      operationId: deleteGate
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/suites/{suite}/triggers:
+    parameters: [{ $ref: "#/components/parameters/SuiteID" }]
+    get:
+      tags: [suites]
+      operationId: listTriggers
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TriggerList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [suites]
+      operationId: createTrigger
+      summary: Create a trigger. Webhook triggers return their HMAC secret once.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TriggerCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/TriggerCreated" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/suites/{suite}/triggers/{trigger}:
+    parameters: [{ $ref: "#/components/parameters/SuiteID" }, { $ref: "#/components/parameters/TriggerID" }]
+    patch:
+      tags: [suites]
+      operationId: updateTrigger
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TriggerUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Trigger" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [suites]
+      operationId: deleteTrigger
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/suites/{suite}/triggers/{trigger}:rotate-secret:
+    parameters: [{ $ref: "#/components/parameters/SuiteID" }, { $ref: "#/components/parameters/TriggerID" }]
+    post:
+      tags: [suites]
+      operationId: rotateTriggerSecret
+      summary: Generate a new webhook HMAC secret (returned once)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TriggerCreated" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- runs
+  /v1/runs:
+    get:
+      tags: [runs]
+      operationId: listRuns
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: project_id, in: query, schema: { type: string, format: uuid } }
+        - { name: suite_id, in: query, schema: { type: string, format: uuid } }
+        - { name: target_id, in: query, schema: { type: string, format: uuid } }
+        - { name: parent_run_id, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, style: form, explode: false, schema: { type: array, items: { $ref: "#/components/schemas/RunStatus" } } }
+        - { name: trigger, in: query, schema: { $ref: "#/components/schemas/TriggerKind" } }
+        - { name: label, in: query, description: "key:value label filters (repeatable, all must match)", style: form, explode: true, schema: { type: array, items: { type: string } } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RunList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [runs]
+      operationId: createRun
+      summary: Start a run of a suite (one run per selected target)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/RunCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/RunCreateResponse" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}:
+    parameters: [{ $ref: "#/components/parameters/RunID" }]
+    get:
+      tags: [runs]
+      operationId: getRun
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [runs]
+      operationId: updateRun
+      summary: Rename a run or edit its labels
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/RunUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [runs]
+      operationId: deleteRun
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}/results:
+    parameters: [{ $ref: "#/components/parameters/RunID" }]
+    get:
+      tags: [runs]
+      operationId: listResults
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: status, in: query, style: form, explode: false, schema: { type: array, items: { $ref: "#/components/schemas/ResultStatus" } } }
+        - { name: evaluator_id, in: query, description: Evaluator for passed/score_min/score_max, schema: { type: string, format: uuid } }
+        - { name: passed, in: query, schema: { type: boolean } }
+        - { name: score_min, in: query, schema: { type: number, format: double } }
+        - { name: score_max, in: query, schema: { type: number, format: double } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: q, in: query, description: Substring search over output, input and error, schema: { type: string } }
+        - { name: example_id, in: query, schema: { type: string, format: uuid } }
+        - { name: trial, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: full, in: query, description: Include raw request/response, schema: { type: boolean } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ResultList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}/results/{result}:
+    parameters: [{ $ref: "#/components/parameters/RunID" }, { name: result, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [runs]
+      operationId: getResult
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Result" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}/aggregates:
+    parameters: [{ $ref: "#/components/parameters/RunID" }]
+    get:
+      tags: [runs]
+      operationId: listRunAggregates
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RunAggregateList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}/events:
+    parameters: [{ $ref: "#/components/parameters/RunID" }]
+    get:
+      tags: [runs]
+      operationId: streamRunEvents
+      summary: Live run events (Server-Sent Events). Each SSE message has `id` = sequence, `event` = type, `data` = RunEvent JSON. Resume with Last-Event-ID.
+      parameters:
+        - { name: Last-Event-ID, in: header, schema: { type: string } }
+      responses:
+        "200": { description: SSE stream, content: { text/event-stream: { schema: { type: string } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}:cancel:
+    parameters: [{ $ref: "#/components/parameters/RunID" }]
+    post:
+      tags: [runs]
+      operationId: cancelRun
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}:rerun-failed:
+    parameters: [{ $ref: "#/components/parameters/RunID" }]
+    post:
+      tags: [runs]
+      operationId: rerunFailed
+      summary: Create a child run covering only failed/errored results
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/runs/{run}:rescore:
+    parameters: [{ $ref: "#/components/parameters/RunID" }]
+    post:
+      tags: [runs]
+      operationId: rescoreRun
+      summary: Re-evaluate existing outputs with (new) evaluators without calling the target
+      requestBody:
+        content: { application/json: { schema: { $ref: "#/components/schemas/RescoreRequest" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- comparisons
+  /v1/comparisons:
+    get:
+      tags: [comparisons]
+      operationId: compareRuns
+      summary: Compare 2–4 runs (first run is the baseline)
+      parameters:
+        - { name: runs, in: query, required: true, style: form, explode: false, schema: { type: array, minItems: 2, maxItems: 4, items: { type: string, format: uuid } } }
+        - { name: evaluator_id, in: query, description: Evaluator used to rank regressions (default first common), schema: { type: string, format: uuid } }
+        - { name: limit, in: query, description: Max regressions/improvements returned, schema: { type: integer, default: 50, maximum: 500 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ComparisonReport" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/projects/{project}/comparisons:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [comparisons]
+      operationId: listComparisons
+      summary: Saved comparison views
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ComparisonList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [comparisons]
+      operationId: createComparison
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ComparisonCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Comparison" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/comparisons/{comparison}:
+    parameters: [{ name: comparison, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [comparisons]
+      operationId: getComparison
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Comparison" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [comparisons]
+      operationId: deleteComparison
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- review
+  /v1/projects/{project}/review-queues:
+    parameters: [{ $ref: "#/components/parameters/ProjectID" }]
+    get:
+      tags: [review]
+      operationId: listReviewQueues
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewQueueList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [review]
+      operationId: createReviewQueue
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ReviewQueueCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewQueue" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/review-queues/{queue}:
+    parameters: [{ $ref: "#/components/parameters/QueueID" }]
+    get:
+      tags: [review]
+      operationId: getReviewQueue
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewQueue" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [review]
+      operationId: updateReviewQueue
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ReviewQueueUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewQueue" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [review]
+      operationId: deleteReviewQueue
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/review-queues/{queue}/items:
+    parameters: [{ $ref: "#/components/parameters/QueueID" }]
+    get:
+      tags: [review]
+      operationId: listReviewItems
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: status, in: query, style: form, explode: false, schema: { type: array, items: { $ref: "#/components/schemas/ReviewItemStatus" } } }
+        - { name: assigned_to, in: query, schema: { type: string, format: uuid } }
+        - { name: expand, in: query, description: Include each item's result, schema: { type: boolean } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewItemList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [review]
+      operationId: addReviewItems
+      summary: Send results to the queue (explicit result ids, or all/failed results of a run)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ReviewItemsAdd" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/CountResponse" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/review-items/{item}:
+    parameters: [{ name: item, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [review]
+      operationId: getReviewItem
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewItem" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [review]
+      operationId: updateReviewItem
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ReviewItemUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReviewItem" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/annotations:
+    get:
+      tags: [review]
+      operationId: listAnnotations
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: project_id, in: query, schema: { type: string, format: uuid } }
+        - { name: result_id, in: query, schema: { type: string, format: uuid } }
+        - { name: review_item_id, in: query, schema: { type: string, format: uuid } }
+        - { name: evaluator_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AnnotationList" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      tags: [review]
+      operationId: createAnnotation
+      summary: Grade a result. With review_item_id (and complete_item, default true) the item is marked done.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AnnotationCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Annotation" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /v1/annotations/{annotation}:
+    parameters: [{ name: annotation, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [review]
+      operationId: getAnnotation
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Annotation" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [review]
+      operationId: updateAnnotation
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AnnotationUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Annotation" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [review]
+      operationId: deleteAnnotation
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+
+  # ---------------------------------------------------------------- inbound webhooks
+  /hooks/{trigger}:
+    parameters: [{ $ref: "#/components/parameters/TriggerID" }]
+    post:
+      tags: [hooks]
+      operationId: fireWebhookTrigger
+      summary: Fire a webhook trigger. Authenticated by HMAC, not by session/API key.
+      description: |
+        Signature: `X-Airval-Signature: sha256=<hex(hmac_sha256(secret, timestamp + "." + body))>` and
+        `X-Airval-Timestamp: <unix seconds>`; requests older than 5 minutes are rejected.
+      security: []
+      parameters:
+        - { name: X-Airval-Signature, in: header, required: true, schema: { type: string } }
+        - { name: X-Airval-Timestamp, in: header, required: true, schema: { type: string } }
+      requestBody:
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/RunCreateResponse" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    cookieAuth: { type: apiKey, in: cookie, name: airval_session }
+    bearerAuth: { type: http, scheme: bearer, description: "API key: airv_..." }
+
+  parameters:
+    Cursor: { name: cursor, in: query, description: Opaque pagination cursor, schema: { type: string } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 50 } }
+    Org: { name: org, in: path, required: true, schema: { type: string, format: uuid } }
+    UserID: { name: user, in: path, required: true, schema: { type: string, format: uuid } }
+    ProjectID: { name: project, in: path, required: true, schema: { type: string, format: uuid } }
+    TargetID: { name: target, in: path, required: true, schema: { type: string, format: uuid } }
+    DatasetID: { name: dataset, in: path, required: true, schema: { type: string, format: uuid } }
+    VersionNumber: { name: number, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    EvaluatorID: { name: evaluator, in: path, required: true, schema: { type: string, format: uuid } }
+    SuiteID: { name: suite, in: path, required: true, schema: { type: string, format: uuid } }
+    TriggerID: { name: trigger, in: path, required: true, schema: { type: string, format: uuid } }
+    RunID: { name: run, in: path, required: true, schema: { type: string, format: uuid } }
+    QueueID: { name: queue, in: path, required: true, schema: { type: string, format: uuid } }
+
+  responses:
+    Error:
+      description: Error
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  schemas:
+    # ------------------------------------------------------------ common
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, description: "Machine-readable code: bad_request, unauthorized, forbidden, not_found, conflict, validation_failed, rate_limited, not_implemented, internal" }
+        message: { type: string }
+        request_id: { type: string }
+        details: { type: object, additionalProperties: true }
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok, degraded, unavailable] }
+        checks: { type: object, additionalProperties: { type: string } }
+    Meta:
+      type: object
+      required: [version, edition, features]
+      properties:
+        version: { type: string }
+        commit: { type: string }
+        edition: { type: string, enum: [core, ee] }
+        features:
+          type: object
+          required: [sso, audit_log]
+          properties:
+            sso: { type: boolean }
+            sso_providers: { type: array, items: { type: string } }
+            audit_log: { type: boolean }
+            signup: { type: boolean }
+    IDList:
+      type: object
+      required: [ids]
+      properties:
+        ids: { type: array, maxItems: 10000, items: { type: string, format: uuid } }
+    CountResponse:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
+    Labels:
+      type: object
+      additionalProperties: { type: string }
+      description: Free-form string labels such as git_sha, branch, pr
+    JSONValue:
+      description: Any JSON value
+      x-go-type: json.RawMessage
+    JSONObject:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+    Role:
+      type: string
+      enum: [owner, admin, editor, viewer]
+
+    # ------------------------------------------------------------ auth & orgs
+    SetupStatus:
+      type: object
+      required: [needs_setup]
+      properties:
+        needs_setup: { type: boolean }
+    SetupRequest:
+      type: object
+      required: [email, password, org_name]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, writeOnly: true }
+        name: { type: string }
+        org_name: { type: string, minLength: 1 }
+        org_slug: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, writeOnly: true }
+    UpdateMeRequest:
+      type: object
+      properties:
+        name: { type: string }
+        avatar_url: { type: string }
+        password: { type: string, minLength: 8, writeOnly: true }
+        current_password: { type: string, writeOnly: true }
+    User:
+      type: object
+      required: [id, email, name, avatar_url, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        name: { type: string }
+        avatar_url: { type: string }
+        created_at: { type: string, format: date-time }
+    Me:
+      type: object
+      required: [auth_method, orgs, csrf_token]
+      properties:
+        auth_method: { type: string, enum: [session, api_key] }
+        user: { $ref: "#/components/schemas/User" }
+        api_key: { $ref: "#/components/schemas/ApiKey" }
+        orgs: { type: array, items: { $ref: "#/components/schemas/Organization" } }
+        csrf_token: { type: string, description: "Send as X-CSRF-Token on mutating requests (empty for API keys)" }
+    Organization:
+      type: object
+      required: [id, name, slug, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    OrganizationList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Organization" } }
+        next_cursor: { type: string, nullable: true }
+    OrganizationCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,62}$" }
+    OrganizationUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,62}$" }
+    Member:
+      type: object
+      required: [user, role, created_at]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        role: { $ref: "#/components/schemas/Role" }
+        created_at: { type: string, format: date-time }
+    MemberList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Member" } }
+        next_cursor: { type: string, nullable: true }
+    MemberCreate:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/Role" }
+        name: { type: string }
+        password: { type: string, minLength: 8, writeOnly: true, description: Initial password when creating a new user }
+    MemberUpdate:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: "#/components/schemas/Role" }
+    ApiKey:
+      type: object
+      required: [id, org_id, name, prefix, role, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid, nullable: true, description: When set the key only reaches this project }
+        name: { type: string }
+        prefix: { type: string, description: First characters of the key, for identification }
+        role: { $ref: "#/components/schemas/Role" }
+        created_by: { type: string, format: uuid, nullable: true }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    ApiKeyList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ApiKey" } }
+        next_cursor: { type: string, nullable: true }
+    ApiKeyCreate:
+      type: object
+      required: [name, role]
+      properties:
+        name: { type: string, minLength: 1 }
+        role: { $ref: "#/components/schemas/Role" }
+        project_id: { type: string, format: uuid }
+        expires_at: { type: string, format: date-time }
+    ApiKeyCreated:
+      allOf:
+        - $ref: "#/components/schemas/ApiKey"
+        - type: object
+          required: [key]
+          properties:
+            key: { type: string, description: "The full key (airv_...). Shown only once." }
+    Secret:
+      type: object
+      required: [id, org_id, name, description, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid, nullable: true }
+        name: { type: string, description: "Referenced in templates as {{ secret \"NAME\" }}" }
+        description: { type: string }
+        key_version: { type: integer }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SecretList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Secret" } }
+        next_cursor: { type: string, nullable: true }
+    SecretCreate:
+      type: object
+      required: [name, value]
+      properties:
+        name: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_]{0,127}$" }
+        value: { type: string, writeOnly: true }
+        description: { type: string }
+        project_id: { type: string, format: uuid }
+    SecretUpdate:
+      type: object
+      properties:
+        value: { type: string, writeOnly: true }
+        description: { type: string }
+    NotificationEvent:
+      type: string
+      enum: [run.finished, run.failed, run.errored, gate.failed]
+    NotificationChannelKind:
+      type: string
+      enum: [slack, webhook, email]
+    NotificationChannelConfig:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      description: Kind-specific settings. Values may reference secrets with {{ secret "NAME" }}.
+      properties:
+        url: { type: string, description: "slack: incoming webhook URL; webhook: destination URL" }
+        headers: { type: object, additionalProperties: { type: string } }
+        signing_secret: { type: string, description: "webhook: secret name used to sign payloads (HMAC-SHA256)" }
+        recipients: { type: array, items: { type: string, format: email } }
+        subject_prefix: { type: string }
+        project_ids: { type: array, items: { type: string, format: uuid }, description: Only notify for these projects (empty = all) }
+    NotificationChannel:
+      type: object
+      required: [id, org_id, name, kind, config, events, enabled, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/NotificationChannelKind" }
+        config: { $ref: "#/components/schemas/NotificationChannelConfig" }
+        events: { type: array, items: { $ref: "#/components/schemas/NotificationEvent" } }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    NotificationChannelList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/NotificationChannel" } }
+        next_cursor: { type: string, nullable: true }
+    NotificationChannelCreate:
+      type: object
+      required: [name, kind, config]
+      properties:
+        name: { type: string, minLength: 1 }
+        kind: { $ref: "#/components/schemas/NotificationChannelKind" }
+        config: { $ref: "#/components/schemas/NotificationChannelConfig" }
+        events: { type: array, items: { $ref: "#/components/schemas/NotificationEvent" } }
+        enabled: { type: boolean, default: true }
+    NotificationChannelUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        config: { $ref: "#/components/schemas/NotificationChannelConfig" }
+        events: { type: array, items: { $ref: "#/components/schemas/NotificationEvent" } }
+        enabled: { type: boolean }
+    AuditEntry:
+      type: object
+      required: [id, org_id, actor, action, target, at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid, nullable: true }
+        actor: { type: string }
+        action: { type: string }
+        target: { type: string }
+        diff: { $ref: "#/components/schemas/JSONValue" }
+        at: { type: string, format: date-time }
+    AuditEntryList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AuditEntry" } }
+        next_cursor: { type: string, nullable: true }
+
+    # ------------------------------------------------------------ projects
+    ProjectSettings:
+      type: object
+      properties:
+        retention_days: { type: integer, minimum: 0, description: Delete runs older than this (0 = keep forever) }
+        default_target_id: { type: string, format: uuid }
+    Project:
+      type: object
+      required: [id, org_id, name, slug, description, color, icon, settings, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        color: { type: string, description: Chart categorical slot name or empty }
+        icon: { type: string, description: Lucide icon name }
+        settings: { $ref: "#/components/schemas/ProjectSettings" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ProjectList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Project" } }
+        next_cursor: { type: string, nullable: true }
+    ProjectCreate:
+      type: object
+      required: [org_id, name]
+      properties:
+        org_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1 }
+        slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,62}$" }
+        description: { type: string }
+        color: { type: string }
+        icon: { type: string }
+        settings: { $ref: "#/components/schemas/ProjectSettings" }
+    ProjectUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,62}$" }
+        description: { type: string }
+        color: { type: string }
+        icon: { type: string }
+        settings: { $ref: "#/components/schemas/ProjectSettings" }
+
+    # ------------------------------------------------------------ targets
+    TargetKind:
+      type: string
+      enum: [http, openai, anthropic, bedrock, vertex, agent]
+    TargetConfig:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      description: |
+        Versioned target configuration. `kind` selects which section is used (`http` for http and agent).
+        Strings in http sections are Go templates: `{{ .input.question }}`, `{{ .vars.base_url }}`, `{{ secret "KEY" }}`.
+      properties:
+        http: { $ref: "#/components/schemas/HttpTargetConfig" }
+        openai: { $ref: "#/components/schemas/OpenAITargetConfig" }
+        anthropic: { $ref: "#/components/schemas/AnthropicTargetConfig" }
+        bedrock: { $ref: "#/components/schemas/BedrockTargetConfig" }
+        vertex: { $ref: "#/components/schemas/VertexTargetConfig" }
+        conversation: { $ref: "#/components/schemas/ConversationConfig" }
+        limits: { $ref: "#/components/schemas/TargetLimits" }
+        cache: { $ref: "#/components/schemas/CachePolicy" }
+        variables: { type: object, additionalProperties: { type: string }, description: Default template variables (overridable per run / by webhooks) }
+    HttpTargetConfig:
+      type: object
+      additionalProperties: true
+      required: [url]
+      properties:
+        method: { type: string, enum: [GET, POST, PUT, PATCH], default: POST }
+        url: { type: string }
+        headers: { type: object, additionalProperties: { type: string } }
+        query: { type: object, additionalProperties: { type: string } }
+        body: { type: string, description: Request body template (usually JSON) }
+        streaming: { type: string, enum: [none, sse, ndjson], default: none }
+        timeout_ms: { type: integer, default: 60000 }
+        retries: { type: integer, default: 2 }
+        response: { $ref: "#/components/schemas/ResponseMapping" }
+        tls: { $ref: "#/components/schemas/TLSConfig" }
+    ResponseMapping:
+      type: object
+      additionalProperties: true
+      description: JSONPath expressions applied to the response body
+      properties:
+        output: { type: string, example: "$.choices[0].message.content" }
+        output_json: { type: string }
+        context: { type: string, description: "Path to an array of retrieved passages" }
+        tool_calls: { type: string }
+        trace: { type: string, description: "agent: path to intermediate steps" }
+        usage_input_tokens: { type: string }
+        usage_output_tokens: { type: string }
+        cost_usd: { type: string }
+        session_id: { type: string, description: Multi-turn session id to feed back }
+        stream_delta: { type: string, description: Path of the text delta inside each SSE/NDJSON chunk }
+    TLSConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        insecure_skip_verify: { type: boolean }
+        ca_cert_secret: { type: string }
+        client_cert_secret: { type: string }
+        client_key_secret: { type: string }
+    LLMSamplingConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        model: { type: string }
+        system_prompt: { type: string }
+        prompt_template: { type: string, description: "User message template (default: {{ .input.input }} or the JSON of input)" }
+        temperature: { type: number, format: double }
+        max_tokens: { type: integer }
+        top_p: { type: number, format: double }
+        tools: { type: array, items: { $ref: "#/components/schemas/JSONObject" } }
+        json_mode: { type: boolean }
+        extra_body: { $ref: "#/components/schemas/JSONObject" }
+    OpenAITargetConfig:
+      allOf:
+        - $ref: "#/components/schemas/LLMSamplingConfig"
+        - type: object
+          additionalProperties: true
+          properties:
+            base_url: { type: string, default: "https://api.openai.com/v1" }
+            api_key_secret: { type: string }
+            organization: { type: string }
+            api_version: { type: string, description: Azure OpenAI api-version }
+            deployment: { type: string, description: Azure OpenAI deployment }
+    AnthropicTargetConfig:
+      allOf:
+        - $ref: "#/components/schemas/LLMSamplingConfig"
+        - type: object
+          additionalProperties: true
+          properties:
+            base_url: { type: string, default: "https://api.anthropic.com" }
+            api_key_secret: { type: string }
+            anthropic_version: { type: string }
+    BedrockTargetConfig:
+      allOf:
+        - $ref: "#/components/schemas/LLMSamplingConfig"
+        - type: object
+          additionalProperties: true
+          properties:
+            region: { type: string }
+            model_id: { type: string }
+            access_key_id_secret: { type: string }
+            secret_access_key_secret: { type: string }
+            session_token_secret: { type: string }
+    VertexTargetConfig:
+      allOf:
+        - $ref: "#/components/schemas/LLMSamplingConfig"
+        - type: object
+          additionalProperties: true
+          properties:
+            project: { type: string }
+            location: { type: string }
+            credentials_secret: { type: string, description: Service account JSON }
+    ConversationConfig:
+      type: object
+      additionalProperties: true
+      description: How multi-turn state is carried between turns
+      properties:
+        state: { type: string, enum: [messages, session_id], default: messages }
+        messages_variable: { type: string, default: messages, description: "Template variable holding the messages array" }
+        simulator: { $ref: "#/components/schemas/JudgeModelConfig" }
+    TargetLimits:
+      type: object
+      additionalProperties: true
+      properties:
+        max_concurrency: { type: integer, minimum: 1 }
+        rpm: { type: integer, minimum: 0, description: Requests per minute (0 = unlimited) }
+        tpm: { type: integer, minimum: 0, description: Tokens per minute (0 = unlimited) }
+        adaptive: { type: boolean, default: true, description: AIMD backoff on 429/5xx }
+    CachePolicy:
+      type: object
+      additionalProperties: true
+      properties:
+        enabled: { type: boolean }
+        ttl_seconds: { type: integer }
+    Target:
+      type: object
+      required: [id, org_id, project_id, name, description, kind, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        kind: { $ref: "#/components/schemas/TargetKind" }
+        current_version: { $ref: "#/components/schemas/TargetVersion" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TargetList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Target" } }
+        next_cursor: { type: string, nullable: true }
+    TargetVersion:
+      type: object
+      required: [id, target_id, number, config, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        target_id: { type: string, format: uuid }
+        number: { type: integer }
+        config: { $ref: "#/components/schemas/TargetConfig" }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+    TargetVersionList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/TargetVersion" } }
+        next_cursor: { type: string, nullable: true }
+    TargetCreate:
+      type: object
+      required: [name, kind, config]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        kind: { $ref: "#/components/schemas/TargetKind" }
+        config: { $ref: "#/components/schemas/TargetConfig" }
+    TargetUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        config: { $ref: "#/components/schemas/TargetConfig" }
+    TargetTestRequest:
+      type: object
+      properties:
+        example: { $ref: "#/components/schemas/ExampleData" }
+        variables: { type: object, additionalProperties: { type: string } }
+    TargetDraftTestRequest:
+      type: object
+      required: [kind, config]
+      properties:
+        kind: { $ref: "#/components/schemas/TargetKind" }
+        config: { $ref: "#/components/schemas/TargetConfig" }
+        example: { $ref: "#/components/schemas/ExampleData" }
+        variables: { type: object, additionalProperties: { type: string } }
+    TargetTestResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        error: { type: string }
+        request: { $ref: "#/components/schemas/JSONValue" }
+        raw_response: { $ref: "#/components/schemas/JSONValue" }
+        status_code: { type: integer }
+        response: { $ref: "#/components/schemas/TargetResponse" }
+    TargetResponse:
+      type: object
+      description: What a target returned for one example (mirrors the execution pipeline's Response)
+      required: [output]
+      properties:
+        output: { type: string }
+        output_json: { $ref: "#/components/schemas/JSONValue" }
+        context: { type: array, items: { type: string } }
+        tool_calls: { type: array, items: { $ref: "#/components/schemas/ToolCall" } }
+        trace: { type: array, items: { $ref: "#/components/schemas/TraceStep" } }
+        transcript: { type: array, items: { $ref: "#/components/schemas/Message" } }
+        usage: { $ref: "#/components/schemas/Usage" }
+        cost_usd: { type: number, format: double }
+        latency_ms: { type: number, format: double }
+        ttft_ms: { type: number, format: double }
+        cached: { type: boolean }
+    ToolCall:
+      type: object
+      required: [name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        arguments: { $ref: "#/components/schemas/JSONValue" }
+        result: { $ref: "#/components/schemas/JSONValue" }
+    TraceStep:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [llm, tool, retrieval, custom] }
+        name: { type: string }
+        input: { $ref: "#/components/schemas/JSONValue" }
+        output: { $ref: "#/components/schemas/JSONValue" }
+        started_at: { type: string, format: date-time }
+        duration: { type: integer, format: int64, description: Nanoseconds }
+    Message:
+      type: object
+      required: [role, content]
+      properties:
+        role: { type: string, enum: [user, assistant, system, tool] }
+        content: { type: string }
+        tool_calls: { type: array, items: { $ref: "#/components/schemas/ToolCall" } }
+    Usage:
+      type: object
+      required: [input_tokens, output_tokens]
+      properties:
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+
+    # ------------------------------------------------------------ datasets
+    Dataset:
+      type: object
+      required: [id, org_id, project_id, name, description, example_count, has_draft_changes, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        schema: { $ref: "#/components/schemas/DatasetSchema" }
+        example_count: { type: integer, description: Examples in the draft }
+        has_draft_changes: { type: boolean, description: The draft differs from the latest published version }
+        latest_version: { $ref: "#/components/schemas/DatasetVersionRef" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time, description: Last draft change }
+    DatasetSchema:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      description: Optional column hints for the editor
+      properties:
+        input_fields: { type: array, items: { type: string } }
+        expected_type: { type: string, enum: [text, json] }
+    DatasetVersionRef:
+      type: object
+      required: [id, number, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer }
+        created_at: { type: string, format: date-time }
+    DatasetList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Dataset" } }
+        next_cursor: { type: string, nullable: true }
+    DatasetCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        schema: { $ref: "#/components/schemas/DatasetSchema" }
+    DatasetUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        schema: { $ref: "#/components/schemas/DatasetSchema" }
+    Conversation:
+      type: object
+      description: Multi-turn script (turns) or simulated user (simulation); exactly one is set
+      properties:
+        turns: { type: array, items: { $ref: "#/components/schemas/Turn" } }
+        simulation: { $ref: "#/components/schemas/Simulation" }
+    Turn:
+      type: object
+      required: [role, content]
+      properties:
+        role: { type: string, enum: [user, assistant, system, tool] }
+        content: { type: string }
+        expected: { type: string }
+    Simulation:
+      type: object
+      required: [persona, goal, max_turns]
+      properties:
+        persona: { type: string }
+        goal: { type: string }
+        first_message: { type: string }
+        max_turns: { type: integer, minimum: 1, maximum: 50 }
+        stop_condition: { type: string }
+    ExampleData:
+      type: object
+      properties:
+        id: { type: string, format: uuid, description: "Upsert: existing example id (omit to create)" }
+        input:
+          type: object
+          additionalProperties: true
+          x-go-type: json.RawMessage
+          description: Template variables, e.g. {"question":"..."}
+        expected: { $ref: "#/components/schemas/JSONValue" }
+        context: { type: array, items: { type: string } }
+        metadata: { $ref: "#/components/schemas/JSONObject" }
+        tags: { type: array, items: { type: string } }
+        conversation:
+          allOf: [{ $ref: "#/components/schemas/Conversation" }]
+          x-go-type: json.RawMessage
+    Example:
+      type: object
+      required: [id, dataset_id, revision_id, input, tags, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        dataset_id: { type: string, format: uuid }
+        revision_id: { type: string, format: uuid }
+        input: { $ref: "#/components/schemas/JSONObject" }
+        expected: { $ref: "#/components/schemas/JSONValue" }
+        context: { type: array, items: { type: string } }
+        metadata: { $ref: "#/components/schemas/JSONObject" }
+        tags: { type: array, items: { type: string } }
+        conversation:
+          allOf: [{ $ref: "#/components/schemas/Conversation" }]
+          x-go-type: json.RawMessage
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ExampleList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Example" } }
+        next_cursor: { type: string, nullable: true }
+    ExampleUpsertRequest:
+      type: object
+      required: [examples]
+      properties:
+        examples: { type: array, minItems: 1, maxItems: 10000, items: { $ref: "#/components/schemas/ExampleData" } }
+    ExampleUpsertResponse:
+      type: object
+      required: [count, examples]
+      properties:
+        count: { type: integer }
+        examples: { type: array, items: { $ref: "#/components/schemas/Example" } }
+    FromResultsRequest:
+      type: object
+      required: [result_ids]
+      properties:
+        result_ids: { type: array, minItems: 1, maxItems: 1000, items: { type: string, format: uuid } }
+        use_output_as_expected: { type: boolean, default: false, description: Store the run output as the expected value }
+        tags: { type: array, items: { type: string } }
+    DatasetImportFormat:
+      type: string
+      enum: [csv, jsonl, json, parquet]
+    ColumnMapping:
+      type: object
+      description: Maps source columns to example fields. Unmapped columns go to metadata when `rest_to_metadata`.
+      properties:
+        input: { type: array, items: { type: string }, description: "Columns that become input fields (name preserved)" }
+        expected: { type: string }
+        context: { type: string }
+        metadata: { type: array, items: { type: string } }
+        tags: { type: string, description: Column with comma-separated tags }
+        conversation: { type: string }
+        rest_to_metadata: { type: boolean }
+    DatasetImportRequest:
+      type: object
+      properties:
+        source:
+          type: object
+          properties:
+            kind: { type: string, enum: [upload, url, huggingface, inline] }
+            url: { type: string }
+            format: { $ref: "#/components/schemas/DatasetImportFormat" }
+            data: { type: string, description: "inline: pasted CSV/JSONL/JSON" }
+            hf_repo: { type: string, description: "huggingface: repo id, e.g. openai/gsm8k" }
+            hf_config: { type: string }
+            hf_split: { type: string, default: train }
+            limit: { type: integer }
+        mapping: { $ref: "#/components/schemas/ColumnMapping" }
+        mode: { type: string, enum: [append, replace], default: append }
+        tags: { type: array, items: { type: string }, description: Tags added to every imported example }
+        preview: { type: boolean, description: Parse and return up to 20 mapped rows without writing }
+        publish: { type: boolean, description: Publish a version after importing }
+    DatasetImportResult:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer, description: Examples written (0 for preview) }
+        columns: { type: array, items: { type: string } }
+        preview: { type: array, items: { $ref: "#/components/schemas/ExampleData" } }
+        errors: { type: array, items: { type: object, required: [row, message], properties: { row: { type: integer }, message: { type: string } } } }
+        version: { $ref: "#/components/schemas/DatasetVersion" }
+    DatasetVersion:
+      type: object
+      required: [id, dataset_id, number, note, example_count, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        dataset_id: { type: string, format: uuid }
+        number: { type: integer }
+        note: { type: string }
+        example_count: { type: integer }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+    DatasetVersionList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/DatasetVersion" } }
+        next_cursor: { type: string, nullable: true }
+    PublishVersionRequest:
+      type: object
+      properties:
+        note: { type: string }
+
+    # ------------------------------------------------------------ evaluators
+    EvaluatorKind:
+      type: string
+      enum:
+        [equals, contains, regex, starts_with, ends_with, is_json, json_schema, jsonpath_equals, numeric_close,
+         levenshtein, rouge_l, bleu, length, latency_ms, cost_usd, tokens, tool_called, tool_sequence, no_pii, refusal,
+         embedding_similarity, llm_rubric, correctness, faithfulness, groundedness, answer_relevance, context_relevance,
+         context_recall, hallucination, toxicity, bias, conciseness, helpfulness, conversation_goal_completion,
+         conversation_coherence, tool_use_correctness, pairwise, human]
+    EvaluatorCategory:
+      type: string
+      enum: [deterministic, model, human]
+    EvaluatorConfig:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      description: Kind-specific options. Only the fields relevant to the kind are used.
+      properties:
+        field: { type: string, description: "What to score: output (default), output_json, context, transcript, or a JSONPath into the output" }
+        value: { $ref: "#/components/schemas/JSONValue" }
+        values: { type: array, items: { type: string } }
+        mode: { type: string, enum: [any, all, none] }
+        case_sensitive: { type: boolean }
+        pattern: { type: string }
+        schema: { $ref: "#/components/schemas/JSONObject" }
+        path: { type: string, description: JSONPath }
+        tolerance: { type: number, format: double }
+        min: { type: number, format: double }
+        max: { type: number, format: double }
+        unit: { type: string, enum: [chars, words, tokens] }
+        tool_name: { type: string }
+        tool_args: { $ref: "#/components/schemas/JSONObject" }
+        sequence: { type: array, items: { type: string } }
+        ordered: { type: boolean }
+        pii_types: { type: array, items: { type: string, enum: [email, phone, credit_card, ssn, ip, iban, address] } }
+        phrases: { type: array, items: { type: string } }
+        judge: { $ref: "#/components/schemas/JudgeModelConfig" }
+        rubric: { type: string, description: "llm_rubric: grading criteria" }
+        prompt: { type: string, description: Override the judge prompt template }
+        scale: { type: object, properties: { min: { type: number, format: double }, max: { type: number, format: double } } }
+        embedding: { $ref: "#/components/schemas/JudgeModelConfig" }
+        review: { $ref: "#/components/schemas/ReviewQueueConfig" }
+    JudgeModelConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        provider: { type: string, enum: [openai, anthropic, bedrock, vertex] }
+        model: { type: string }
+        base_url: { type: string }
+        api_key_secret: { type: string }
+        temperature: { type: number, format: double, default: 0 }
+        samples: { type: integer, minimum: 1, maximum: 9, default: 1, description: N-sample voting }
+        aggregation: { type: string, enum: [median, mean, majority], default: median }
+        use_logprobs: { type: boolean }
+        cache: { type: boolean, default: true }
+        max_concurrency: { type: integer }
+        rpm: { type: integer }
+    Evaluator:
+      type: object
+      required: [id, org_id, project_id, name, description, kind, category, config, version, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        kind: { $ref: "#/components/schemas/EvaluatorKind" }
+        category: { $ref: "#/components/schemas/EvaluatorCategory" }
+        config: { $ref: "#/components/schemas/EvaluatorConfig" }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    EvaluatorList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Evaluator" } }
+        next_cursor: { type: string, nullable: true }
+    EvaluatorCreate:
+      type: object
+      required: [name, kind]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        kind: { $ref: "#/components/schemas/EvaluatorKind" }
+        config: { $ref: "#/components/schemas/EvaluatorConfig" }
+    EvaluatorUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        kind: { $ref: "#/components/schemas/EvaluatorKind" }
+        config: { $ref: "#/components/schemas/EvaluatorConfig" }
+    EvaluatorPreviewRequest:
+      type: object
+      required: [kind, response]
+      properties:
+        project_id: { type: string, format: uuid, description: Project whose secrets judges may use }
+        kind: { $ref: "#/components/schemas/EvaluatorKind" }
+        config: { $ref: "#/components/schemas/EvaluatorConfig" }
+        example: { $ref: "#/components/schemas/ExampleData" }
+        response: { $ref: "#/components/schemas/TargetResponse" }
+    EvaluatorAgreement:
+      type: object
+      required: [evaluator_id, n]
+      properties:
+        evaluator_id: { type: string, format: uuid }
+        n: { type: integer, description: Results with both a score and a human annotation }
+        cohens_kappa: { type: number, format: double, nullable: true }
+        percent_agreement: { type: number, format: double, nullable: true }
+        mean_abs_error: { type: number, format: double, nullable: true }
+
+    # ------------------------------------------------------------ suites, gates, triggers
+    Severity:
+      type: string
+      enum: [critical, major, minor]
+    ApplyTo:
+      type: string
+      enum: [final, per_turn, conversation, trace]
+    SuiteEvaluator:
+      type: object
+      required: [evaluator_id]
+      properties:
+        evaluator_id: { type: string, format: uuid }
+        weight: { type: number, format: double, default: 1 }
+        threshold: { type: number, format: double, description: "Pass if value >= threshold (0..1)" }
+        severity: { $ref: "#/components/schemas/Severity" }
+        apply_to: { $ref: "#/components/schemas/ApplyTo" }
+        fail_fast: { type: boolean, description: "If this (deterministic) check fails, skip judges for the example" }
+    SuiteDataset:
+      type: object
+      required: [dataset_id]
+      properties:
+        dataset_id: { type: string, format: uuid }
+        version: { type: integer, nullable: true, description: "Pinned version number; null = latest published" }
+    Sampling:
+      type: object
+      properties:
+        mode: { type: string, enum: [none, random, stratified], default: none }
+        n: { type: integer, minimum: 1 }
+        percent: { type: number, format: double, minimum: 0, maximum: 100 }
+        seed: { type: integer, format: int64 }
+    BaselinePolicy:
+      type: object
+      properties:
+        policy: { type: string, enum: [none, pinned, last_passing], default: last_passing }
+        run_id: { type: string, format: uuid, description: "pinned: the baseline run" }
+        target_id: { type: string, format: uuid, description: "last_passing: on this target (default: same target)" }
+    SuiteConfig:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      properties:
+        target_ids: { type: array, items: { type: string, format: uuid }, description: One run per target; several give an automatic comparison }
+        datasets: { type: array, items: { $ref: "#/components/schemas/SuiteDataset" } }
+        evaluators: { type: array, items: { $ref: "#/components/schemas/SuiteEvaluator" } }
+        trials: { type: integer, minimum: 1, maximum: 10, default: 1 }
+        sampling: { $ref: "#/components/schemas/Sampling" }
+        limits: { $ref: "#/components/schemas/TargetLimits" }
+        cache: { type: object, properties: { target: { type: boolean, default: false }, judges: { type: boolean, default: true } } }
+        baseline: { $ref: "#/components/schemas/BaselinePolicy" }
+        failure_budget: { type: object, properties: { critical_failures: { type: integer, description: Cancel the run early after this many critical failures } } }
+        timeout_seconds: { type: integer }
+        variables: { type: object, additionalProperties: { type: string } }
+    Suite:
+      type: object
+      required: [id, org_id, project_id, name, slug, description, config, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        config: { $ref: "#/components/schemas/SuiteConfig" }
+        baseline_run_id: { type: string, format: uuid, nullable: true }
+        last_run: { $ref: "#/components/schemas/Run" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SuiteList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Suite" } }
+        next_cursor: { type: string, nullable: true }
+    SuiteCreate:
+      type: object
+      required: [name, config]
+      properties:
+        name: { type: string, minLength: 1 }
+        slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,62}$" }
+        description: { type: string }
+        config: { $ref: "#/components/schemas/SuiteConfig" }
+    SuiteUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        slug: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,62}$" }
+        description: { type: string }
+        config: { $ref: "#/components/schemas/SuiteConfig" }
+        baseline_run_id: { type: string, format: uuid, nullable: true }
+    GateExpr:
+      type: object
+      x-go-type: json.RawMessage
+      description: |
+        Gate expression AST. Logical nodes (`and`, `or`, `not`) have `args`; `compare` nodes compute
+        `fn(metric[, evaluator][, selector][, tag]) comparator value`. Examples:
+        mean(faithfulness) >= 0.85 → {op:compare, fn:mean, metric:evaluator, evaluator_id, comparator:">=", value:0.85};
+        count(critical_fail) == 0 → {op:compare, fn:count, metric:results, selector:critical_fail, comparator:"==", value:0}.
+      required: [op]
+      properties:
+        op: { type: string, enum: [and, or, not, compare] }
+        args: { type: array, items: { $ref: "#/components/schemas/GateExpr" } }
+        fn: { type: string, enum: [mean, pass_rate, count, sum, min, max, stddev, p50, p90, p95, p99, regression_vs_baseline] }
+        metric: { type: string, enum: [evaluator, results, latency_ms, ttft_ms, cost_usd, tokens] }
+        evaluator_id: { type: string, format: uuid }
+        selector: { type: string, enum: [all, passed, failed, errored, critical_fail, major_fail, minor_fail] }
+        tag: { type: string, description: Restrict to examples with this tag }
+        comparator: { type: string, enum: [">=", ">", "<=", "<", "==", "!="] }
+        value: { type: number, format: double }
+    Gate:
+      type: object
+      required: [id, suite_id, name, expr, text, enabled, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        suite_id: { type: string, format: uuid }
+        name: { type: string }
+        expr: { $ref: "#/components/schemas/GateExpr" }
+        text: { type: string, description: Human-readable rendering of expr }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    GateList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Gate" } }
+    GateCreate:
+      type: object
+      required: [expr]
+      properties:
+        name: { type: string }
+        expr: { $ref: "#/components/schemas/GateExpr" }
+        enabled: { type: boolean, default: true }
+    GateUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        expr: { $ref: "#/components/schemas/GateExpr" }
+        enabled: { type: boolean }
+    TriggerKind:
+      type: string
+      enum: [manual, schedule, webhook, api]
+    TriggerConfig:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      properties:
+        cron: { type: string, description: "schedule: 5-field cron expression" }
+        timezone: { type: string, default: UTC }
+        target_ids: { type: array, items: { type: string, format: uuid }, description: Override the suite's targets }
+        sampling: { $ref: "#/components/schemas/Sampling" }
+        trials: { type: integer }
+        labels: { $ref: "#/components/schemas/Labels" }
+        variables: { type: object, additionalProperties: { type: string } }
+        payload_variables: { type: object, additionalProperties: { type: string }, description: "webhook: variable name → JSONPath into the payload (e.g. preview URL)" }
+        payload_labels: { type: object, additionalProperties: { type: string }, description: "webhook: label name → JSONPath (e.g. git_sha)" }
+    Trigger:
+      type: object
+      required: [id, suite_id, name, kind, config, enabled, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        suite_id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/TriggerKind" }
+        config: { $ref: "#/components/schemas/TriggerConfig" }
+        enabled: { type: boolean }
+        next_fire_at: { type: string, format: date-time, nullable: true }
+        last_fired_at: { type: string, format: date-time, nullable: true }
+        webhook_url: { type: string, description: "webhook: the URL to POST to" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TriggerList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Trigger" } }
+    TriggerCreate:
+      type: object
+      required: [kind]
+      properties:
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/TriggerKind" }
+        config: { $ref: "#/components/schemas/TriggerConfig" }
+        enabled: { type: boolean, default: true }
+    TriggerCreated:
+      allOf:
+        - $ref: "#/components/schemas/Trigger"
+        - type: object
+          properties:
+            webhook_secret: { type: string, description: "webhook: HMAC secret, shown only once" }
+    TriggerUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        config: { $ref: "#/components/schemas/TriggerConfig" }
+        enabled: { type: boolean }
+
+    # ------------------------------------------------------------ runs
+    RunStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, errored, canceled]
+      description: succeeded = finished and gates passed (or none); failed = finished with a failing gate
+    ResultStatus:
+      type: string
+      enum: [passed, failed, errored, skipped]
+    RunCreate:
+      type: object
+      required: [suite_id]
+      properties:
+        suite_id: { type: string, format: uuid }
+        target_ids: { type: array, items: { type: string, format: uuid }, description: "Override the suite's targets (one run each)" }
+        name: { type: string }
+        labels: { $ref: "#/components/schemas/Labels" }
+        sampling: { $ref: "#/components/schemas/Sampling" }
+        trials: { type: integer, minimum: 1, maximum: 10 }
+        baseline_run_id: { type: string, format: uuid }
+        variables: { type: object, additionalProperties: { type: string }, description: Target template variable overrides }
+        trigger_ref: { type: string, description: "Free-form reference, e.g. CI job URL" }
+    RunCreateResponse:
+      type: object
+      required: [runs]
+      properties:
+        runs: { type: array, items: { $ref: "#/components/schemas/Run" } }
+    RunUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        labels: { $ref: "#/components/schemas/Labels" }
+    RescoreRequest:
+      type: object
+      properties:
+        evaluator_ids: { type: array, items: { type: string, format: uuid }, description: "Evaluators to apply (default: the suite's current evaluators)" }
+    GateResult:
+      type: object
+      required: [gate_id, passed]
+      properties:
+        gate_id: { type: string, format: uuid }
+        name: { type: string }
+        text: { type: string }
+        passed: { type: boolean }
+        value: { type: number, format: double, nullable: true }
+        detail: { type: string }
+    RunSummary:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      properties:
+        pass_rate: { type: number, format: double }
+        mean_score: { type: number, format: double }
+        gates: { type: array, items: { $ref: "#/components/schemas/GateResult" } }
+        duration_ms: { type: number, format: double }
+        throughput_per_min: { type: number, format: double }
+        cache_hit_ratio: { type: number, format: double }
+        rate_limited_ratio: { type: number, format: double }
+        latency_p50_ms: { type: number, format: double }
+        latency_p95_ms: { type: number, format: double }
+        stopped_early: { type: boolean }
+    Run:
+      type: object
+      required: [id, org_id, project_id, name, trigger_kind, trigger_ref, labels, status, total, completed, failed, errored, cost_usd, tokens_in, tokens_out, error, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        suite_id: { type: string, format: uuid, nullable: true }
+        target_id: { type: string, format: uuid, nullable: true }
+        target_version_id: { type: string, format: uuid, nullable: true }
+        dataset_version_id: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        trigger_kind: { $ref: "#/components/schemas/TriggerKind" }
+        trigger_ref: { type: string }
+        labels: { $ref: "#/components/schemas/Labels" }
+        status: { $ref: "#/components/schemas/RunStatus" }
+        total: { type: integer, description: Planned example × trial count }
+        completed: { type: integer }
+        failed: { type: integer }
+        errored: { type: integer }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        baseline_run_id: { type: string, format: uuid, nullable: true }
+        parent_run_id: { type: string, format: uuid, nullable: true }
+        gate_passed: { type: boolean, nullable: true }
+        summary: { $ref: "#/components/schemas/RunSummary" }
+        cost_usd: { type: number, format: double }
+        tokens_in: { type: integer, format: int64 }
+        tokens_out: { type: integer, format: int64 }
+        error: { type: string }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    RunList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Run" } }
+        next_cursor: { type: string, nullable: true }
+    Score:
+      type: object
+      required: [evaluator_id, label, reason]
+      properties:
+        evaluator_id: { type: string, format: uuid }
+        value: { type: number, format: double, nullable: true, description: Normalized 0..1 }
+        label: { type: string }
+        passed: { type: boolean, nullable: true }
+        reason: { type: string }
+        meta: { $ref: "#/components/schemas/JSONObject" }
+        latency_ms: { type: number, format: double }
+        cost_usd: { type: number, format: double }
+    Result:
+      type: object
+      required: [id, run_id, example_id, example_revision_id, trial, status, output, latency_ms, tokens_in, tokens_out, cost_usd, error, cached, tags, scores, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        example_id: { type: string, format: uuid }
+        example_revision_id: { type: string, format: uuid }
+        trial: { type: integer }
+        status: { $ref: "#/components/schemas/ResultStatus" }
+        input: { $ref: "#/components/schemas/JSONObject" }
+        expected: { $ref: "#/components/schemas/JSONValue" }
+        output: { type: string }
+        output_json: { $ref: "#/components/schemas/JSONValue" }
+        context:
+          type: array
+          items: { type: string }
+          x-go-type: json.RawMessage
+        tool_calls:
+          type: array
+          items: { $ref: "#/components/schemas/ToolCall" }
+          x-go-type: json.RawMessage
+        trace:
+          type: array
+          items: { $ref: "#/components/schemas/TraceStep" }
+          x-go-type: json.RawMessage
+        transcript:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+          x-go-type: json.RawMessage
+        request: { $ref: "#/components/schemas/JSONValue" }
+        response: { $ref: "#/components/schemas/JSONValue" }
+        latency_ms: { type: number, format: double }
+        ttft_ms: { type: number, format: double, nullable: true }
+        tokens_in: { type: integer }
+        tokens_out: { type: integer }
+        cost_usd: { type: number, format: double }
+        error: { type: string }
+        cached: { type: boolean }
+        tags: { type: array, items: { type: string } }
+        scores: { type: array, items: { $ref: "#/components/schemas/Score" } }
+        created_at: { type: string, format: date-time }
+    ResultList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Result" } }
+        next_cursor: { type: string, nullable: true }
+    Histogram:
+      type: object
+      required: [edges, counts]
+      properties:
+        edges: { type: array, items: { type: number, format: double } }
+        counts: { type: array, items: { type: integer } }
+    RunAggregate:
+      type: object
+      required: [run_id, metric, slice_key, n]
+      properties:
+        run_id: { type: string, format: uuid }
+        evaluator_id: { type: string, format: uuid, nullable: true, description: Null for run-level metrics }
+        metric: { type: string, description: "score | latency_ms | ttft_ms | cost_usd | tokens | pass_rate" }
+        slice_key: { type: string, description: '"" for all results, "tag:<tag>" for a per-tag slice' }
+        n: { type: integer }
+        mean: { type: number, format: double, nullable: true }
+        min: { type: number, format: double, nullable: true }
+        max: { type: number, format: double, nullable: true }
+        p50: { type: number, format: double, nullable: true }
+        p90: { type: number, format: double, nullable: true }
+        p95: { type: number, format: double, nullable: true }
+        p99: { type: number, format: double, nullable: true }
+        stddev: { type: number, format: double, nullable: true }
+        sum: { type: number, format: double, nullable: true }
+        pass_rate: { type: number, format: double, nullable: true }
+        histogram: { $ref: "#/components/schemas/Histogram" }
+    RunAggregateList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/RunAggregate" } }
+    RunEvent:
+      type: object
+      description: Payload of one SSE message from /v1/runs/{run}/events
+      required: [type, run_id, at]
+      properties:
+        seq: { type: integer, format: int64 }
+        type: { type: string, enum: [run.status, run.progress, result, run.finished] }
+        run_id: { type: string, format: uuid }
+        at: { type: string, format: date-time }
+        data: { $ref: "#/components/schemas/JSONObject" }
+    TrendMetric:
+      type: string
+      enum: [pass_rate, score_mean, latency_p50, latency_p95, cost_usd, tokens]
+    TrendPoint:
+      type: object
+      required: [t, value]
+      properties:
+        t: { type: string, format: date-time }
+        value: { type: number, format: double, nullable: true }
+        n: { type: integer }
+        run_id: { type: string, format: uuid }
+    TrendSeries:
+      type: object
+      required: [key, label, points]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        suite_id: { type: string, format: uuid }
+        target_id: { type: string, format: uuid }
+        evaluator_id: { type: string, format: uuid }
+        points: { type: array, items: { $ref: "#/components/schemas/TrendPoint" } }
+    Trend:
+      type: object
+      required: [metric, series]
+      properties:
+        metric: { $ref: "#/components/schemas/TrendMetric" }
+        series: { type: array, items: { $ref: "#/components/schemas/TrendSeries" } }
+
+    # ------------------------------------------------------------ comparisons
+    Comparison:
+      type: object
+      required: [id, project_id, name, run_ids, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        run_ids: { type: array, items: { type: string, format: uuid } }
+        created_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+    ComparisonList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Comparison" } }
+        next_cursor: { type: string, nullable: true }
+    ComparisonCreate:
+      type: object
+      required: [run_ids]
+      properties:
+        name: { type: string }
+        run_ids: { type: array, minItems: 2, maxItems: 4, items: { type: string, format: uuid } }
+    ScorecardCell:
+      type: object
+      required: [run_id, n]
+      properties:
+        run_id: { type: string, format: uuid }
+        n: { type: integer }
+        mean: { type: number, format: double, nullable: true }
+        pass_rate: { type: number, format: double, nullable: true }
+        delta_mean: { type: number, format: double, nullable: true, description: vs the first run }
+        delta_pass_rate: { type: number, format: double, nullable: true }
+    ScorecardRow:
+      type: object
+      required: [key, label, cells]
+      properties:
+        key: { type: string, description: 'evaluator id or a run-level metric ("latency_p95", "cost_usd")' }
+        label: { type: string }
+        evaluator_id: { type: string, format: uuid }
+        cells: { type: array, items: { $ref: "#/components/schemas/ScorecardCell" } }
+    ExampleDeltaCell:
+      type: object
+      required: [run_id]
+      properties:
+        run_id: { type: string, format: uuid }
+        result_id: { type: string, format: uuid }
+        value: { type: number, format: double, nullable: true }
+        passed: { type: boolean, nullable: true }
+        output: { type: string }
+    ExampleDelta:
+      type: object
+      required: [example_id, delta, cells]
+      properties:
+        example_id: { type: string, format: uuid }
+        input: { $ref: "#/components/schemas/JSONObject" }
+        expected: { $ref: "#/components/schemas/JSONValue" }
+        delta: { type: number, format: double, description: Last run's score minus the first run's }
+        cells: { type: array, items: { $ref: "#/components/schemas/ExampleDeltaCell" } }
+    ComparisonReport:
+      type: object
+      required: [runs, scorecard, regressions, improvements]
+      properties:
+        runs: { type: array, items: { $ref: "#/components/schemas/Run" } }
+        evaluator_id: { type: string, format: uuid }
+        scorecard: { type: array, items: { $ref: "#/components/schemas/ScorecardRow" } }
+        regressions: { type: array, items: { $ref: "#/components/schemas/ExampleDelta" } }
+        improvements: { type: array, items: { $ref: "#/components/schemas/ExampleDelta" } }
+        scatter: { type: array, items: { type: object, required: [example_id, a, b], properties: { example_id: { type: string, format: uuid }, a: { type: number, format: double }, b: { type: number, format: double } } } }
+        pairwise: { type: object, properties: { wins: { type: integer }, ties: { type: integer }, losses: { type: integer } } }
+
+    # ------------------------------------------------------------ review
+    ReviewQueueConfig:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+      properties:
+        mode: { type: string, enum: [all, failures, sample], default: failures }
+        sample_pct: { type: number, format: double, minimum: 0, maximum: 100 }
+        scale: { type: object, properties: { min: { type: number, format: double, default: 1 }, max: { type: number, format: double, default: 5 } } }
+        pass_fail: { type: boolean, default: true }
+        labels: { type: array, items: { type: string } }
+        instructions: { type: string }
+    ReviewQueue:
+      type: object
+      required: [id, project_id, name, description, config, pending_count, done_count, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        evaluator_id: { type: string, format: uuid, nullable: true, description: Human evaluator whose scores the annotations become }
+        config: { $ref: "#/components/schemas/ReviewQueueConfig" }
+        pending_count: { type: integer }
+        done_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ReviewQueueList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ReviewQueue" } }
+        next_cursor: { type: string, nullable: true }
+    ReviewQueueCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        evaluator_id: { type: string, format: uuid }
+        config: { $ref: "#/components/schemas/ReviewQueueConfig" }
+    ReviewQueueUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        evaluator_id: { type: string, format: uuid, nullable: true }
+        config: { $ref: "#/components/schemas/ReviewQueueConfig" }
+    ReviewItemStatus:
+      type: string
+      enum: [pending, in_progress, done, skipped]
+    ReviewItem:
+      type: object
+      required: [id, queue_id, run_id, result_id, status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        queue_id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        result_id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/ReviewItemStatus" }
+        assigned_to: { type: string, format: uuid, nullable: true }
+        completed_by: { type: string, format: uuid, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        result: { $ref: "#/components/schemas/Result" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ReviewItemList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ReviewItem" } }
+        next_cursor: { type: string, nullable: true }
+    ReviewItemsAdd:
+      type: object
+      properties:
+        result_ids: { type: array, maxItems: 10000, items: { type: string, format: uuid } }
+        run_id: { type: string, format: uuid, description: "With `select`: add a run's results" }
+        select: { type: string, enum: [all, failures], default: failures }
+    ReviewItemUpdate:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/ReviewItemStatus" }
+        assigned_to: { type: string, format: uuid, nullable: true }
+    Annotation:
+      type: object
+      required: [id, project_id, result_id, label, comment, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        result_id: { type: string, format: uuid }
+        review_item_id: { type: string, format: uuid, nullable: true }
+        user_id: { type: string, format: uuid, nullable: true }
+        evaluator_id: { type: string, format: uuid, nullable: true }
+        value: { type: number, format: double, nullable: true }
+        label: { type: string }
+        passed: { type: boolean, nullable: true }
+        comment: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AnnotationList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Annotation" } }
+        next_cursor: { type: string, nullable: true }
+    AnnotationCreate:
+      type: object
+      required: [result_id]
+      properties:
+        result_id: { type: string, format: uuid }
+        review_item_id: { type: string, format: uuid }
+        complete_item: { type: boolean, default: true }
+        evaluator_id: { type: string, format: uuid }
+        value: { type: number, format: double, minimum: 0, maximum: 1 }
+        label: { type: string }
+        passed: { type: boolean }
+        comment: { type: string }
+    AnnotationUpdate:
+      type: object
+      properties:
+        evaluator_id: { type: string, format: uuid, nullable: true }
+        value: { type: number, format: double, nullable: true, minimum: 0, maximum: 1 }
+        label: { type: string }
+        passed: { type: boolean, nullable: true }
+        comment: { type: string }
