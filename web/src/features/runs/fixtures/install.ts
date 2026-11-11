@@ -49,6 +49,7 @@ async function handle(method: string, url: URL, request: Request): Promise<Respo
     fx.projects.push(proj)
     return json(proj, 201)
   }
+  if (/^\/projects\/[^/]+\/comparisons$/.test(p)) return json(method === 'GET' ? { items: [] } : { id: crypto.randomUUID(), project_id: seg[1], name: body.name ?? '', run_ids: body.run_ids, created_at: new Date().toISOString() }, method === 'GET' ? 200 : 201)
   if (seg[0] === 'projects' && seg[1] && seg.length === 3) {
     const pid = seg[1]
     if (!projectFor(pid)) return notFound()
@@ -64,6 +65,9 @@ async function handle(method: string, url: URL, request: Request): Promise<Respo
         return scoped(fx.datasets)
       case 'review-queues':
         return scoped(fx.reviewQueues)
+      case 'overview':
+        if (!isMain(pid)) return json({ runs_7d: 0, runs_prev_7d: 0, spend_7d_usd: 0, failing_gates: 0 })
+        return json(fx.overview(pid))
       case 'trends':
         if (!isMain(pid)) return json({ metric: url.searchParams.get('metric') ?? 'pass_rate', series: [] })
         return json(fx.trends(Object.fromEntries(url.searchParams)))
@@ -130,7 +134,10 @@ async function handle(method: string, url: URL, request: Request): Promise<Respo
       const max = q.get('score_max') != null ? Number(q.get('score_max')) : null
       const tag = q.get('tag')
       const text = q.get('q')?.toLowerCase()
+      const exFilter = q.get('example_id')
+      const exIdx = exFilter ? parseInt(exFilter.slice(24), 16) : null
       const ls = fx.lights(run.id).filter((l) => {
+        if (exIdx != null && l.i % meta.datasetSize !== exIdx) return false
         if (status && !status.includes(l.status)) return false
         if (evIdx >= 0) {
           const v = l.scores[evIdx]
@@ -158,7 +165,15 @@ async function handle(method: string, url: URL, request: Request): Promise<Respo
     const ids = (url.searchParams.get('runs') ?? '').split(',').filter(Boolean)
     if (ids.length < 2) return json({ code: 'bad_request', message: 'Pick 2–4 runs' }, 400)
     await delay(250)
-    return json(fx.compare(ids, url.searchParams.get('evaluator_id') ?? undefined, Number(url.searchParams.get('limit') ?? 50)))
+    return json(
+      fx.compare(
+        ids,
+        url.searchParams.get('evaluator_id') ?? undefined,
+        Number(url.searchParams.get('limit') ?? 50),
+        url.searchParams.get('against') ?? undefined,
+        Number(url.searchParams.get('offset') ?? 0),
+      ),
+    )
   }
   if (/^\/datasets\/[^/]+:from-results$/.test(p)) return json({ count: body.result_ids?.length ?? 0 })
   if (/^\/review-queues\/[^/]+\/items$/.test(p) && method === 'POST') return json({ count: body.result_ids?.length ?? 0 })

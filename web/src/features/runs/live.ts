@@ -98,7 +98,6 @@ export function useRunEvents(runId: string, enabled: boolean): LiveState {
     let attempt = 0
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let flushTimer: ReturnType<typeof setTimeout> | undefined
-    let aggTimer: ReturnType<typeof setInterval> | undefined
     let disposed = false
     const buffer: RunEvent[] = []
 
@@ -146,7 +145,7 @@ export function useRunEvents(runId: string, enabled: boolean): LiveState {
     }
     connect()
     // Aggregates (charts, scorecards) are recomputed server-side; refresh them at a calm cadence.
-    aggTimer = setInterval(() => void qc.invalidateQueries({ queryKey: runKeys.aggregates(runId) }), 5_000)
+    const aggTimer = setInterval(() => void qc.invalidateQueries({ queryKey: runKeys.aggregates(runId) }), 5_000)
 
     return () => {
       disposed = true

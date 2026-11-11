@@ -102,7 +102,7 @@ export const evaluators: S['Evaluator'][] = evalDefs.map((d) => ({
   description: '',
   kind: d.kind,
   category: d.category,
-  config: d.judge ? { judge: { provider: 'openai', model: 'gpt-4o-mini' } } : {},
+  config: (d.judge ? { judge: { provider: 'openai', model: 'gpt-4o-mini' } } : {}) as S['EvaluatorConfig'],
   version: 1,
 }))
 const evalIds = evaluators.map((e) => e.id)
@@ -120,8 +120,8 @@ export const datasets: S['Dataset'][] = [
 ]
 
 export const reviewQueues: S['ReviewQueue'][] = [
-  { id: uuid(), project_id: main.id, name: 'Failure triage', description: '', config: { mode: 'failures' }, pending_count: 37, done_count: 210, created_at: base.created_at, updated_at: base.updated_at },
-  { id: uuid(), project_id: main.id, name: 'Weekly spot check', description: '', config: { mode: 'sample', sample_pct: 2 }, pending_count: 8, done_count: 64, created_at: base.created_at, updated_at: base.updated_at },
+  { id: uuid(), project_id: main.id, name: 'Failure triage', description: '', config: { mode: 'failures', pass_fail: true }, pending_count: 37, done_count: 210, created_at: base.created_at, updated_at: base.updated_at },
+  { id: uuid(), project_id: main.id, name: 'Weekly spot check', description: '', config: { mode: 'sample', sample_pct: 2, pass_fail: false }, pending_count: 8, done_count: 64, created_at: base.created_at, updated_at: base.updated_at },
 ]
 
 const suiteEval = (ids: number[]): S['SuiteEvaluator'][] =>
@@ -746,7 +746,7 @@ export function childRun(parent: Run, kind: 'rerun' | 'rescore'): Run {
 }
 
 // ------------------------------------------------------------------ comparison
-export function compare(runIds: string[], evaluatorId?: string, limit = 50): S['ComparisonReport'] {
+export function compare(runIds: string[], evaluatorId?: string, limit = 50, against?: string, offset = 0): S['ComparisonReport'] {
   const rs = runIds.map((id) => runs.find((r) => r.id === id)).filter((r): r is Run => !!r)
   const metas = rs.map((r) => runMeta.get(r.id)!)
   const evIds = [...new Set(metas.flatMap((m) => m.evalIdx.map((ei) => evalIds[ei]!)))]
@@ -766,6 +766,13 @@ export function compare(runIds: string[], evaluatorId?: string, limit = 50): S['
         pass_rate: v.pass_rate,
         delta_mean: i && v.mean != null && vals[0]!.mean != null ? v.mean - vals[0]!.mean : null,
         delta_pass_rate: i && v.pass_rate != null && vals[0]!.pass_rate != null ? v.pass_rate - vals[0]!.pass_rate : null,
+        ...(i && v.mean != null && vals[0]!.mean != null
+          ? (() => {
+              const d = v.mean - vals[0]!.mean
+              const half = 0.012 + Math.abs(d) * 0.15
+              return { ci_low: d - half, ci_high: d + half, significant: Math.abs(d) > half, p_value: Math.abs(d) > half ? 0.004 : 0.31, paired: v.n }
+            })()
+          : {}),
       })),
     }
   }
@@ -789,42 +796,56 @@ export function compare(runIds: string[], evaluatorId?: string, limit = 50): S['
       return { n: 0, mean: sum, pass_rate: null }
     }),
   ]
-  // Per-example deltas on the ranking evaluator (trial 0, aligned by dataset index).
+  // Per-example deltas on the ranking evaluator (trial 0, aligned by dataset index), baseline vs `against`.
   const ls = rs.map((r) => lights(r.id))
   const ks = metas.map((m) => m.evalIdx.findIndex((ei) => evalIds[ei] === evId))
+  const ai = Math.max(1, against ? rs.findIndex((r) => r.id === against) : 1)
   const n = Math.min(...metas.map((m) => m.datasetSize), ...ls.map((l) => l.length))
+  const exId = (i: number) => `0193ex00-0000-7000-8000-${i.toString(16).padStart(12, '0')}`
+  const inputPreview = (i: number) => example(i).qa.q.replace('{n}', String(48_000 + i * 7))
   const deltas: S['ExampleDelta'][] = []
   const scatter: NonNullable<S['ComparisonReport']['scatter']> = []
+  const rows: S['ComparisonRow'][] = []
   let wins = 0
   let ties = 0
   let losses = 0
   for (let i = 0; i < n; i++) {
     const vals = ls.map((l, j) => l[i]!.scores[ks[j]!] ?? null)
+    const pass = ls.map((l, j) => l[i]!.passed[ks[j]!] ?? null)
+    rows.push({ example_id: exId(i), input_preview: inputPreview(i), cells: rs.map((r, j) => ({ run_id: r.id, value: vals[j], passed: pass[j] })) })
     const a = vals[0]
-    const b = vals[vals.length - 1]
+    const b = vals[ai]
     if (a == null || b == null) continue
     const d = b - a
-    if (scatter.length < 3000) scatter.push({ example_id: `ex${i}`, a, b })
+    if (scatter.length < 3000) scatter.push({ example_id: exId(i), a, b })
     if (d > 0.05) wins++
     else if (d < -0.05) losses++
     else ties++
-    deltas.push({ example_id: `ex${i}`, delta: d, cells: [] })
-  }
-  const detail = (d: S['ExampleDelta']): S['ExampleDelta'] => {
-    const i = Number(d.example_id.slice(2))
-    const full = rs.map((r, j) => toResult(r.id, ls[j]![i]!))
-    return {
-      example_id: full[0]!.example_id,
-      input: full[0]!.input,
-      expected: full[0]!.expected,
-      delta: d.delta,
-      cells: full.map((res, j) => ({ run_id: rs[j]!.id, result_id: res.id, value: res.scores[ks[j]!]?.value ?? null, passed: res.scores[ks[j]!]?.passed ?? null, output: res.output })),
-    }
+    deltas.push({ example_id: exId(i), input_preview: inputPreview(i), baseline: a, candidate: b, delta: d, baseline_passed: pass[0], candidate_passed: pass[ai] })
   }
   deltas.sort((x, y) => x.delta - y.delta)
-  const regressions = deltas.filter((d) => d.delta < -0.02).slice(0, limit).map(detail)
-  const improvements = deltas.filter((d) => d.delta > 0.02).reverse().slice(0, limit).map(detail)
-  return { runs: rs, evaluator_id: evId, scorecard, regressions, improvements, scatter, pairwise: { wins, ties, losses } }
+  const regs = deltas.filter((d) => d.delta < -0.02)
+  const imps = deltas.filter((d) => d.delta > 0.02).reverse()
+  rows.sort((x, y) => {
+    const dx = (x.cells[ai]?.value ?? 0) - (x.cells[0]?.value ?? 0)
+    const dy = (y.cells[ai]?.value ?? 0) - (y.cells[0]?.value ?? 0)
+    return dx - dy
+  })
+  return {
+    runs: rs,
+    evaluator_id: evId,
+    evaluators: common.map((id) => ({ id, name: evaluators.find((e) => e.id === id)!.name })),
+    against_run_id: rs[ai]?.id,
+    scorecard,
+    regressions: regs.slice(offset, offset + limit),
+    regressions_total: regs.length,
+    improvements: imps.slice(offset, offset + limit),
+    improvements_total: imps.length,
+    scatter,
+    rows: rows.slice(offset, offset + limit),
+    rows_total: rows.length,
+    pairwise: [{ run_id: rs[ai]!.id, wins, ties, losses, win_rate: (wins + ties / 2) / Math.max(1, wins + ties + losses) }],
+  }
 }
 
 // ------------------------------------------------------------------ trends
@@ -851,5 +872,32 @@ export function trends(q: { suite_id?: string; evaluator_id?: string; metric?: s
     series: suites
       .filter((s) => !q.suite_id || s.id === q.suite_id)
       .map((s) => ({ key: s.id, label: s.name, suite_id: s.id, points: pts(done.filter((r) => r.suite_id === s.id), (r) => r.summary?.pass_rate ?? null) })),
+  }
+}
+
+// ------------------------------------------------------------------ overview
+export function overview(projectId: string): S['ProjectOverview'] {
+  const rs = runs.filter((r) => r.project_id === projectId)
+  const now = Date.now()
+  const in7 = rs.filter((r) => now - Date.parse(r.created_at) < 7 * DAY)
+  const prev7 = rs.filter((r) => now - Date.parse(r.created_at) >= 7 * DAY && now - Date.parse(r.created_at) < 14 * DAY)
+  const finished = rs.filter((r) => r.summary?.pass_rate != null && !['running', 'queued', 'canceled'].includes(r.status))
+  const latest = finished[0]
+  const prev = latest ? finished.find((r) => r.id !== latest.id && r.suite_id === latest.suite_id) : undefined
+  const failing = suites
+    .map((s) => ({ s, r: finished.find((r) => r.suite_id === s.id) }))
+    .filter((x) => x.r && x.r.gate_passed === false)
+    .map((x) => ({ suite_id: x.s.id, name: x.s.name, run_id: x.r!.id }))
+  return {
+    runs_7d: in7.length,
+    runs_prev_7d: prev7.length,
+    latest_run: rs[0],
+    latest_pass_rate: latest?.summary?.pass_rate ?? null,
+    pass_rate_delta: latest && prev ? (latest.summary!.pass_rate ?? 0) - (prev.summary!.pass_rate ?? 0) : null,
+    avg_score: latest?.summary?.mean_score ?? null,
+    spend_7d_usd: in7.reduce((a, r) => a + r.cost_usd, 0),
+    spend_prev_7d_usd: prev7.reduce((a, r) => a + r.cost_usd, 0),
+    failing_gates: failing.length,
+    failing_suites: failing,
   }
 }

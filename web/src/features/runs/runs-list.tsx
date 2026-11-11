@@ -54,7 +54,6 @@ export function RunsScreen() {
     if (search.range === 'custom' && search.from && search.to) return { from: new Date(search.from), to: new Date(search.to), preset: undefined }
     const p = presets.find((x) => x.id === (search.range ?? 'all')) ?? allTime
     return { ...p.range(), preset: p.id }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.range, search.from, search.to])
 
   const query: RunListQuery = {

@@ -181,15 +181,18 @@ export function useRunAction(runId: string) {
         qc.setQueryData(runKeys.detail(runId), run)
         void done()
       },
+      onError: () => {},
     }),
     rerunFailed: useMutation({
       mutationFn: () => unwrap(api.POST('/v1/runs/{run}:rerun-failed', { params: { path: { run: runId } } })),
       onSuccess: done,
+      onError: () => {},
     }),
     rescore: useMutation({
       mutationFn: (evaluatorIds?: string[]) =>
         unwrap(api.POST('/v1/runs/{run}:rescore', { params: { path: { run: runId } }, body: { evaluator_ids: evaluatorIds } })),
       onSuccess: done,
+      onError: () => {},
     }),
   }
 }
@@ -203,6 +206,7 @@ export function useAddToDataset() {
           body: { result_ids: resultIds, use_output_as_expected: useOutput },
         }),
       ),
+    onError: () => {},
   })
 }
 
@@ -210,5 +214,15 @@ export function useSendToReview() {
   return useMutation({
     mutationFn: ({ queueId, resultIds }: { queueId: string; resultIds: string[] }) =>
       unwrap(api.POST('/v1/review-queues/{queue}/items', { params: { path: { queue: queueId } }, body: { result_ids: resultIds, select: 'all' } })),
+    onError: () => {},
   })
 }
+
+export type ProjectOverview = S['ProjectOverview']
+export const overviewQuery = (projectId: string) =>
+  queryOptions({
+    queryKey: ['overview', projectId] as const,
+    queryFn: () => unwrap(api.GET('/v1/projects/{project}/overview', { params: { path: { project: projectId } } })),
+    enabled: !!projectId,
+    refetchInterval: 30_000,
+  })
